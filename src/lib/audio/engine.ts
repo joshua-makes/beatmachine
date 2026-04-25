@@ -90,18 +90,26 @@ export class AudioEngine {
    * velocity: 0-1, duration in seconds.
    */
   playTone(freq: number, velocity: number, duration: number): void {
+    this.playToneAt(freq, velocity, duration, this.context?.currentTime ?? 0);
+  }
+
+  /**
+   * Same as playTone but fires at a precise scheduled `startTime` (Web Audio clock).
+   * Used by the step sequencer so melody notes are in sync with samples.
+   */
+  playToneAt(freq: number, velocity: number, duration: number, startTime: number): void {
     if (!this.context || !this.masterGain || !this.initialized) return;
     const ctx = this.context;
-    const now = ctx.currentTime;
+    const t = startTime;
 
     const env = ctx.createGain();
     env.connect(this.masterGain);
-    env.gain.setValueAtTime(0, now);
-    env.gain.linearRampToValueAtTime(velocity * 0.7, now + 0.01);
-    env.gain.exponentialRampToValueAtTime(velocity * 0.3, now + 0.15);
-    env.gain.setValueAtTime(velocity * 0.3, now + Math.max(duration - 0.2, 0.05));
-    env.gain.exponentialRampToValueAtTime(0.001, now + duration);
-    env.gain.setValueAtTime(0, now + duration + 0.01);
+    env.gain.setValueAtTime(0, t);
+    env.gain.linearRampToValueAtTime(velocity * 0.7, t + 0.01);
+    env.gain.exponentialRampToValueAtTime(velocity * 0.3, t + 0.15);
+    env.gain.setValueAtTime(velocity * 0.3, t + Math.max(duration - 0.2, 0.05));
+    env.gain.exponentialRampToValueAtTime(0.001, t + duration);
+    env.gain.setValueAtTime(0, t + duration + 0.01);
 
     const partials: Array<{ ratio: number; gain: number; type: OscillatorType }> = [
       { ratio: 1, gain: 1.00, type: "triangle" },
@@ -119,8 +127,8 @@ export class AudioEngine {
       oscGain.gain.value = gain;
       osc.connect(oscGain);
       oscGain.connect(env);
-      osc.start(now);
-      osc.stop(now + duration + 0.05);
+      osc.start(t);
+      osc.stop(t + duration + 0.05);
     }
   }
 

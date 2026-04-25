@@ -8,12 +8,12 @@ import { Visualizer } from "@/components/beat/Visualizer";
 import { SessionMenu } from "@/components/beat/SessionMenu";
 import { RecordPanel } from "@/components/beat/RecordPanel";
 import { getEngine } from "@/lib/audio/engine";
-import { Scheduler } from "@/lib/audio/scheduler";
+import { Scheduler, stepDurationSec } from "@/lib/audio/scheduler";
 import { createDefaultPattern, decodeShareUrl, type Pattern, type TrackState } from "@/lib/pattern";
 import { clamp, TRACK_COLORS } from "@/lib/utils";
 import { PianoKeyboard } from "@/components/beat/PianoKeyboard";
 import { MidiPanel } from "@/components/beat/MidiPanel";
-import { noteFrequency, type NoteName, type ScaleName } from "@/lib/scales";
+import { noteFrequency, midiNoteNumber, getScaleMidiSet, NOTE_NAMES, type NoteName, type ScaleName } from "@/lib/scales";
 import { sendDrumNote, sendMelodicNote } from "@/lib/audio/midi";
 
 export default function Home() {
@@ -43,9 +43,11 @@ export default function Home() {
   const [initialized, setInitialized] = useState(false);
 
   // Piano / keyboard state
-  const [pianoRoot,   setPianoRoot]   = useState<NoteName>("C");
-  const [pianoScale,  setPianoScale]  = useState<ScaleName>("major");
-  const [pianoOctave, setPianoOctave] = useState(3);
+  const [pianoRoot,     setPianoRoot]     = useState<NoteName>("C");
+  const [pianoScale,    setPianoScale]    = useState<ScaleName>("major");
+  const [pianoOctave,   setPianoOctave]   = useState(3);
+  /** Currently armed MIDI note — set when user clicks a piano key, painted into melody steps */
+  const [selectedNote,  setSelectedNote]  = useState<number | null>(null);
 
   const schedulerRef    = useRef<Scheduler | null>(null);
   const patternRef      = useRef<Pattern>(pattern);
@@ -98,7 +100,18 @@ export default function Home() {
     p.tracks.forEach((track) => {
       if (track.mute) return;
       if (hasSolo && !track.solo) return;
-      if (track.steps[step]) {
+      if (!track.steps[step]) return;
+
+      if (track.type === "melody") {
+        const midi = track.notes?.[step];
+        if (midi != null) {
+          const dur = stepDurationSec(p.bpm) * 1.8;
+          engine.playToneAt(noteFrequency(midi), track.vol * 0.85, dur, time);
+          if (midiAccessRef.current && midiOutputIdRef.current) {
+            sendMelodicNote(midiAccessRef.current, midiOutputIdRef.current, midi, Math.round(track.vol * 85), Math.round(dur * 1000));
+          }
+        }
+      } else {
         engine.playBuffer(track.sampleId, track.id, time);
         if (midiAccessRef.current && midiOutputIdRef.current) {
           sendDrumNote(midiAccessRef.current, midiOutputIdRef.current, track.sampleId);
@@ -182,6 +195,9 @@ export default function Home() {
         steps: count > t.steps.length
           ? [...t.steps, ...Array(count - t.steps.length).fill(false)]
           : t.steps.slice(0, count),
+        notes: count > t.notes.length
+          ? [...t.notes, ...Array(count - t.notes.length).fill(null)]
+          : t.notes.slice(0, count),
       })),
     }));
   }
@@ -198,11 +214,58 @@ export default function Home() {
   }
 
   function handleClearTrack(trackIndex: number) {
-    updateTrack(trackIndex, (t) => ({ ...t, steps: t.steps.map(() => false) }));
+    updateTrack(trackIndex, (t) => ({
+      ...t,
+      steps: t.steps.map(() => false),
+      notes: t.notes.map(() => null),
+    }));
   }
 
   function handleRandomizeTrack(trackIndex: number) {
-    updateTrack(trackIndex, (t) => ({ ...t, steps: t.steps.map(() => Math.random() < 0.3) }));
+    const track = pattern.tracks[trackIndex];
+    if (track.type === "melody") {
+      // Pick random notes from the current scale in the piano octave range
+      const scaleMidi = getScaleMidiSet(pianoRoot, pianoScale);
+      const lo = midiNoteNumber(pianoRoot, pianoOctave) - 12;
+      const hi = midiNoteNumber(pianoRoot, pianoOctave) + 14;
+      const pool = Array.from(scaleMidi).filter((m) => m >= lo && m <= hi);
+      if (pool.length === 0) return;
+      updateTrack(trackIndex, (t) => {
+        const newSteps = t.steps.map(() => Math.random() < 0.3);
+        const newNotes = newSteps.map((on) =>
+          on ? pool[Math.floor(Math.random() * pool.length)] : null
+        );
+        return { ...t, steps: newSteps, notes: newNotes };
+      });
+    } else {
+      updateTrack(trackIndex, (t) => ({ ...t, steps: t.steps.map(() => Math.random() < 0.3) }));
+    }
+  }
+
+  function handleToggleTrackType(trackIndex: number) {
+    updateTrack(trackIndex, (t) => ({
+      ...t,
+      type: t.type === "melody" ? "drum" : "melody",
+    }));
+  }
+
+  /** Toggle a step in a melody track, painting the currently armed note */
+  function handleToggleMelodyStep(trackIndex: number, step: number) {
+    const note = selectedNote ?? midiNoteNumber(pianoRoot, pianoOctave);
+    updateTrack(trackIndex, (t) => {
+      if (t.steps[step]) {
+        return {
+          ...t,
+          steps: t.steps.map((v, i) => (i === step ? false : v)),
+          notes: t.notes.map((n, i) => (i === step ? null : n)),
+        };
+      }
+      return {
+        ...t,
+        steps: t.steps.map((v, i) => (i === step ? true : v)),
+        notes: t.notes.map((n, i) => (i === step ? note : n)),
+      };
+    });
   }
 
   function handleSwingChange(swing: number) {
@@ -218,6 +281,7 @@ export default function Home() {
     const engine = getEngine();
     await engine.resume();
     engine.playTone(noteFrequency(midi), 0.8, 1.5);
+    setSelectedNote(midi);  // arm this note for melody step painting
     if (midiAccessRef.current && midiOutputIdRef.current) {
       sendMelodicNote(midiAccessRef.current, midiOutputIdRef.current, midi, 90, 500);
     }
@@ -309,11 +373,17 @@ export default function Home() {
               currentStep={currentStep}
               isPlaying={isPlaying}
               trackColor={TRACK_COLORS[i % TRACK_COLORS.length]}
-              onToggleStep={(step) => handleToggleStep(i, step)}
+              selectedNote={selectedNote}
+              onToggleStep={(step) =>
+                track.type === "melody"
+                  ? handleToggleMelodyStep(i, step)
+                  : handleToggleStep(i, step)
+              }
               onChangeSample={(sampleId) => handleChangeSample(i, sampleId)}
               onChangeVol={(vol) => handleChangeVol(i, vol)}
               onToggleMute={() => handleToggleMute(i)}
               onToggleSolo={() => handleToggleSolo(i)}
+              onToggleType={() => handleToggleTrackType(i)}
               onClear={() => handleClearTrack(i)}
               onRandomize={() => handleRandomizeTrack(i)}
             />
@@ -327,6 +397,7 @@ export default function Home() {
           root={pianoRoot}
           scale={pianoScale}
           octave={pianoOctave}
+          selectedNote={selectedNote}
           onRootChange={setPianoRoot}
           onScaleChange={setPianoScale}
           onOctaveChange={setPianoOctave}

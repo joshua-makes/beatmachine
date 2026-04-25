@@ -14,6 +14,19 @@ import { Tooltip } from "@/components/ui/Tooltip";
 /** Convert a MIDI note number to its note name (e.g. 60 → "C") */
 const midiToName = (midi: number) => NOTE_NAMES[midi % 12];
 
+// ── Popular presets ──────────────────────────────────────────────────────────
+interface Preset { label: string; root: NoteName; scale: ScaleName; }
+const PRESETS: Preset[] = [
+  { label: "C Maj",    root: "C",  scale: "major"      },
+  { label: "A Min",    root: "A",  scale: "minor"      },
+  { label: "G Maj",    root: "G",  scale: "major"      },
+  { label: "E Min",    root: "E",  scale: "minor"      },
+  { label: "D Dor",    root: "D",  scale: "dorian"     },
+  { label: "C Blues",  root: "C",  scale: "blues"      },
+  { label: "A Penta",  root: "A",  scale: "pentaMinor" },
+  { label: "F Mix",    root: "F",  scale: "mixolydian" },
+];
+
 // White key chromatic offsets within an octave (C=0, D=2, E=4, F=5, G=7, A=9, B=11)
 const WHITE_KEY_OFFSETS = [0, 2, 4, 5, 7, 9, 11] as const;
 
@@ -31,6 +44,8 @@ interface PianoKeyboardProps {
   root: NoteName;
   scale: ScaleName;
   octave: number;
+  /** Currently armed MIDI note (shown with emerald ring on the keyboard key) */
+  selectedNote?: number | null;
   onRootChange: (root: NoteName) => void;
   onScaleChange: (scale: ScaleName) => void;
   onOctaveChange: (octave: number) => void;
@@ -42,6 +57,7 @@ export function PianoKeyboard({
   root,
   scale,
   octave,
+  selectedNote,
   onRootChange,
   onScaleChange,
   onOctaveChange,
@@ -74,6 +90,33 @@ export function PianoKeyboard({
 
   return (
     <div className="space-y-3">
+      {/* ── Presets ── */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <Tooltip content="Quick-select a popular key + scale combo">
+          <span className="text-xs font-semibold uppercase tracking-widest text-ink-dim cursor-default">Presets</span>
+        </Tooltip>
+        <div className="flex flex-wrap gap-1">
+          {PRESETS.map((p) => {
+            const active = root === p.root && scale === p.scale;
+            return (
+              <button
+                key={p.label}
+                type="button"
+                onClick={() => { onRootChange(p.root); onScaleChange(p.scale); }}
+                aria-pressed={active}
+                title={`${p.root} ${SCALE_LABELS[p.scale]}`}
+                className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold border transition-colors ${
+                  active
+                    ? "bg-indigo-600 text-white border-indigo-500"
+                    : "bg-well border-rim text-ink-dim hover:text-ink hover:border-indigo-400/50"
+                }`}
+              >
+                {p.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
       {/* ── Header row ── */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <span className="text-sm font-semibold text-ink flex items-center gap-1.5">
@@ -160,19 +203,21 @@ export function PianoKeyboard({
               {/* White keys */}
               {WHITE_KEY_OFFSETS.map((offset) => {
                 const midi = (oct + 1) * 12 + offset;
+                const isArmed = midi === selectedNote;
                 return (
                   <button
                     key={offset}
                     type="button"
                     onPointerDown={(e) => { e.preventDefault(); onPlayNote(midi); }}
                     aria-label={`${NOTE_NAMES[offset]}${oct}`}
-                    className={`flex-1 h-full border-r border-zinc-300 dark:border-zinc-500 transition-colors select-none rounded-b-sm ${whiteKeyClass(midi)}`}
+                    className={`flex-1 h-full border-r border-zinc-300 dark:border-zinc-500 transition-colors select-none rounded-b-sm ${whiteKeyClass(midi)} ${isArmed ? "ring-2 ring-inset ring-emerald-400 z-10 relative" : ""}`}
                   />
                 );
               })}
               {/* Black keys (absolutely positioned) */}
               {BLACK_KEYS.map(({ offset, leftPct }) => {
                 const midi = (oct + 1) * 12 + offset;
+                const isArmed = midi === selectedNote;
                 return (
                   <button
                     key={offset}
@@ -180,7 +225,7 @@ export function PianoKeyboard({
                     onPointerDown={(e) => { e.preventDefault(); onPlayNote(midi); }}
                     aria-label={`${NOTE_NAMES[offset]}${oct}`}
                     style={{ left: `${leftPct}%`, width: "8.57%", height: "60%", top: 0 }}
-                    className={`absolute z-10 rounded-b-sm transition-colors select-none ${blackKeyClass(midi)}`}
+                    className={`absolute z-10 rounded-b-sm transition-colors select-none ${blackKeyClass(midi)} ${isArmed ? "ring-2 ring-emerald-400 z-20" : ""}`}
                   />
                 );
               })}

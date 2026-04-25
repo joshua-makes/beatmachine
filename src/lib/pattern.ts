@@ -3,10 +3,14 @@ import LZString from "lz-string";
 export interface TrackState {
   id: string;
   sampleId: string;
+  /** "drum" plays a sample; "melody" plays a pitched tone */
+  type: "drum" | "melody";
   vol: number;
   mute: boolean;
   solo: boolean;
   steps: boolean[];
+  /** MIDI note number per step — only used by melody tracks */
+  notes: (number | null)[];
 }
 
 export interface Pattern {
@@ -32,10 +36,12 @@ export function createDefaultPattern(): Pattern {
     tracks: Array.from({ length: TRACK_COUNT }, (_, i) => ({
       id: `track-${i}`,
       sampleId: DEFAULT_SAMPLES[i] ?? "kick",
+      type: "drum" as const,
       vol: 0.8,
       mute: false,
       solo: false,
       steps: Array(STEP_COUNT).fill(false) as boolean[],
+      notes: Array(STEP_COUNT).fill(null) as (number | null)[],
     })),
   };
 }
@@ -51,6 +57,14 @@ export function deserializePattern(data: string): Pattern {
     // Back-compat: fill in fields added after initial release
     const raw = parsed as unknown as Record<string, unknown>;
     if (typeof raw.swing !== "number") raw.swing = 0;
+    // Back-compat: ensure each track has type + notes fields
+    if (Array.isArray(raw.tracks)) {
+      raw.tracks = (raw.tracks as Array<Record<string, unknown>>).map((t) => ({
+        type: "drum",
+        notes: Array((t.steps as boolean[]).length).fill(null),
+        ...t,
+      }));
+    }
     return raw as unknown as Pattern;
   } catch {
     return createDefaultPattern();

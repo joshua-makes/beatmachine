@@ -1,10 +1,16 @@
 "use client";
 import React from "react";
 import { type TrackState } from "@/lib/pattern";
+import { NOTE_NAMES } from "@/lib/scales";
 import { SampleSelect } from "./SampleSelect";
 import { StepGrid } from "./StepGrid";
 import { Toggle } from "@/components/ui/Toggle";
 import { Tooltip } from "@/components/ui/Tooltip";
+
+/** Format MIDI note as e.g. "C4", "F#3" */
+function midiLabel(midi: number): string {
+  return NOTE_NAMES[midi % 12] + String(Math.floor(midi / 12) - 1);
+}
 
 interface TrackRowProps {
   track: TrackState;
@@ -12,11 +18,13 @@ interface TrackRowProps {
   currentStep: number | null;
   isPlaying: boolean;
   trackColor: string;
+  selectedNote: number | null;
   onToggleStep: (step: number) => void;
   onChangeSample: (sampleId: string) => void;
   onChangeVol: (vol: number) => void;
   onToggleMute: () => void;
   onToggleSolo: () => void;
+  onToggleType: () => void;
   onClear: () => void;
   onRandomize: () => void;
 }
@@ -27,22 +35,58 @@ export function TrackRow({
   currentStep,
   isPlaying,
   trackColor,
+  selectedNote,
   onToggleStep,
   onChangeSample,
   onChangeVol,
   onToggleMute,
   onToggleSolo,
+  onToggleType,
   onClear,
   onRandomize,
 }: TrackRowProps) {
+  const isMelody = track.type === "melody";
+
+  // Build note labels for melody steps
+  const noteLabels = isMelody
+    ? track.notes.map((midi) => (midi != null ? midiLabel(midi) : null))
+    : undefined;
+
   return (
     <div className={`flex items-center gap-3 px-2 py-1.5 rounded-lg transition-opacity ${track.mute ? "opacity-40" : ""}`}>
       {/* Track controls */}
-      <div className="flex items-center gap-2 w-52 min-w-52 shrink-0">
+      <div className="flex items-center gap-1.5 w-52 min-w-52 shrink-0">
         {/* Color strip */}
         <div className="w-1 h-7 rounded-full shrink-0" style={{ backgroundColor: trackColor }} />
         <span className="text-xs font-mono text-ink-ghost w-4 text-right shrink-0">{trackIndex + 1}</span>
-        <SampleSelect value={track.sampleId} trackIndex={trackIndex} onChange={onChangeSample} />
+
+        {/* Type toggle — small icon button */}
+        <Tooltip content={isMelody ? "Switch to drum/sample track" : "Switch to melody track (uses piano notes)"}>
+          <button
+            type="button"
+            onClick={onToggleType}
+            className="text-sm shrink-0 w-5 h-5 flex items-center justify-center rounded hover:bg-well transition-colors"
+            aria-label={isMelody ? "Switch to drum" : "Switch to melody"}
+          >
+            {isMelody ? "🎵" : "🥁"}
+          </button>
+        </Tooltip>
+
+        {isMelody ? (
+          <div className="flex flex-col min-w-0 flex-1">
+            <span className="text-[11px] font-semibold text-indigo-400 leading-tight">Melody</span>
+            {selectedNote !== null ? (
+              <span className="text-[9px] text-emerald-400 font-mono leading-tight">
+                ● armed: {midiLabel(selectedNote)}
+              </span>
+            ) : (
+              <span className="text-[9px] text-ink-ghost leading-tight">click a key to arm</span>
+            )}
+          </div>
+        ) : (
+          <SampleSelect value={track.sampleId} trackIndex={trackIndex} onChange={onChangeSample} />
+        )}
+
         <Toggle pressed={track.mute} onToggle={onToggleMute} label="M" variant="mute" tooltip={track.mute ? "Unmute this track" : "Mute this track"} />
         <Toggle pressed={track.solo} onToggle={onToggleSolo} label="S" variant="solo" tooltip={track.solo ? "Unsolo" : "Solo — mute all other tracks"} />
       </div>
@@ -52,8 +96,9 @@ export function TrackRow({
         steps={track.steps}
         currentStep={isPlaying ? currentStep : null}
         trackIndex={trackIndex}
-        trackColor={trackColor}
+        trackColor={isMelody ? "#6366f1" : trackColor}
         onToggle={onToggleStep}
+        noteLabels={noteLabels}
       />
 
       {/* Per-track volume + quick actions */}
@@ -70,7 +115,7 @@ export function TrackRow({
             aria-label={`Track ${trackIndex + 1} volume`}
           />
         </Tooltip>
-        <Tooltip content="Randomize — fill steps randomly (~30% density)">
+        <Tooltip content={isMelody ? "Randomize — fill with random scale notes" : "Randomize — fill steps randomly (~30% density)"}>
           <button
             type="button"
             onClick={onRandomize}
