@@ -88,9 +88,6 @@ export function Transport({
         >
           <span className="text-base leading-none" aria-hidden="true">{isPlaying ? "⏸" : "▶"}</span>
           {isPlaying ? "Pause" : "Play"}
-          <kbd className="hidden sm:inline-flex items-center ml-1 px-1 py-0.5 text-[9px] font-mono font-semibold bg-white/20 rounded leading-none">
-            Space
-          </kbd>
         </button>
       </Tooltip>
 
