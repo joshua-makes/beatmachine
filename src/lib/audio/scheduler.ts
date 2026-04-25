@@ -18,7 +18,18 @@ export interface SchedulerOptions {
   getStepCount: () => number;
   /** 0 = straight, 100 = max swing (~triplet 2:1 ratio) */
   getSwing: () => number;
+  /**
+   * Called every step with (globalStep, time).
+   * globalStep increments monotonically; use modulo with stepCount for position.
+   */
   onStep: (step: number, time: number) => void;
+  /**
+   * Optional: when chain mode is active, called at the end of each bar so the
+   * caller can flip the active slot. Returns the step count for the NEXT bar.
+   */
+  onBarEnd?: () => void;
+  /** Whether chain A→B is active — reads each tick so toggling takes effect next bar */
+  getChain?: () => boolean;
 }
 
 export class Scheduler {
@@ -27,6 +38,8 @@ export class Scheduler {
   private getStepCount: () => number;
   private getSwing: () => number;
   private onStep: (step: number, time: number) => void;
+  private onBarEnd?: () => void;
+  private getChain?: () => boolean;
   private currentStep = 0;
   private nextNoteTime = 0;
   private intervalId: ReturnType<typeof setInterval> | null = null;
@@ -39,6 +52,8 @@ export class Scheduler {
     this.getStepCount = options.getStepCount;
     this.getSwing = options.getSwing;
     this.onStep = options.onStep;
+    this.onBarEnd = options.onBarEnd;
+    this.getChain = options.getChain;
   }
 
   start() {
@@ -63,7 +78,16 @@ export class Scheduler {
       const swingAmt = (this.getSwing() / 100) * 0.33;
       const isEven = this.currentStep % 2 === 0;
       this.nextNoteTime += stepDur * (isEven ? 1 + swingAmt : 1 - swingAmt);
-      this.currentStep = (this.currentStep + 1) % this.getStepCount();
+
+      const stepCount = this.getStepCount();
+      this.currentStep++;
+      // At bar end: if chain is active, fire onBarEnd so caller can flip slot
+      if (this.currentStep >= stepCount) {
+        this.currentStep = 0;
+        if (this.getChain?.() && this.onBarEnd) {
+          this.onBarEnd();
+        }
+      }
     }
   }
 }

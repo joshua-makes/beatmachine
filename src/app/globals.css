@@ -24,15 +24,22 @@
   --color-ink-ghost:  #3f3f46;
 }
 
+html {
+  overflow-x: hidden;
+}
+
 body {
   background-color: var(--color-canvas);
   color: var(--color-ink);
-  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
 }
 
 * {
   box-sizing: border-box;
+  /* Prevent text-size inflation on mobile */
+  -webkit-text-size-adjust: 100%;
 }
 
 /* Custom scrollbar */

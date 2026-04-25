@@ -3,6 +3,8 @@ import LZString from "lz-string";
 export interface TrackState {
   id: string;
   sampleId: string;
+  /** User-editable display name */
+  name?: string;
   /** "drum" plays a sample; "melody" plays a pitched tone */
   type: "drum" | "melody";
   vol: number;
@@ -11,6 +13,10 @@ export interface TrackState {
   steps: boolean[];
   /** MIDI note number per step — only used by melody tracks */
   notes: (number | null)[];
+  /** Per-step velocity 0–1 (default 1.0). Right-click active steps to cycle soft/ghost. */
+  velocity: number[];
+  /** Per-step fire probability 0–1 (default 1.0). 1 = always fires, 0.5 = 50% chance. */
+  probability: number[];
 }
 
 export interface Pattern {
@@ -42,6 +48,8 @@ export function createDefaultPattern(): Pattern {
       solo: false,
       steps: Array(STEP_COUNT).fill(false) as boolean[],
       notes: Array(STEP_COUNT).fill(null) as (number | null)[],
+      velocity: Array(STEP_COUNT).fill(1) as number[],
+      probability: Array(STEP_COUNT).fill(1) as number[],
     })),
   };
 }
@@ -62,6 +70,8 @@ export function deserializePattern(data: string): Pattern {
       raw.tracks = (raw.tracks as Array<Record<string, unknown>>).map((t) => ({
         type: "drum",
         notes: Array((t.steps as boolean[]).length).fill(null),
+        velocity: Array((t.steps as boolean[]).length).fill(1),
+        probability: Array((t.steps as boolean[]).length).fill(1),
         ...t,
       }));
     }

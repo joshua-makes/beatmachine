@@ -1,12 +1,26 @@
 import React from "react";
 import { cn } from "@/lib/utils";
 
-interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
-  label?: string;
-  options: { value: string; label: string }[];
+export interface SelectOption {
+  value: string;
+  label: string;
 }
 
-export function Select({ label, options, className, id, ...props }: SelectProps) {
+export interface SelectGroup {
+  /** Label shown as the optgroup header */
+  groupLabel: string;
+  options: SelectOption[];
+}
+
+interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
+  label?: string;
+  /** Flat list of options (no grouping). Mutually exclusive with `groups`. */
+  options?: SelectOption[];
+  /** Grouped options rendered as <optgroup> elements. */
+  groups?: SelectGroup[];
+}
+
+export function Select({ label, options, groups, className, id, ...props }: SelectProps) {
   return (
     <div className="flex items-center gap-1.5">
       {label && (
@@ -22,11 +36,21 @@ export function Select({ label, options, className, id, ...props }: SelectProps)
         )}
         {...props}
       >
-        {options.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
+        {groups
+          ? groups.map((g) => (
+              <optgroup key={g.groupLabel} label={g.groupLabel}>
+                {g.options.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </optgroup>
+            ))
+          : options?.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
       </select>
     </div>
   );

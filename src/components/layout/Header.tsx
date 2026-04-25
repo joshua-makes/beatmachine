@@ -12,7 +12,7 @@ export function Header() {
       </div>
       <nav className="flex items-center gap-1">
         <a
-          href="https://github.com/bestacles/beatmachine"
+          href="https://github.com/joshua-makes/beatmachine"
           target="_blank"
           rel="noopener noreferrer"
           className="rounded-md px-3 py-1.5 text-xs font-medium text-ink-dim hover:text-ink hover:bg-well transition-colors"

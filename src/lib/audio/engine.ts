@@ -72,7 +72,7 @@ export class AudioEngine {
     if (g) g.gain.value = vol;
   }
 
-  playBuffer(sampleId: string, trackId: string, time: number): void {
+  playBuffer(sampleId: string, trackId: string, time: number, velocity = 1.0): void {
     if (!this.context || !this.initialized) return;
     const buffer = this.buffers.get(sampleId);
     if (!buffer) return;
@@ -81,8 +81,46 @@ export class AudioEngine {
 
     const source = this.context.createBufferSource();
     source.buffer = buffer;
-    source.connect(trackGain);
+    if (velocity !== 1.0) {
+      const velGain = this.context.createGain();
+      velGain.gain.value = velocity;
+      source.connect(velGain);
+      velGain.connect(trackGain);
+    } else {
+      source.connect(trackGain);
+    }
     source.start(time);
+  }
+
+  /**
+   * Preview a sample immediately. Initialises the audio engine if needed
+   * (requires a user-gesture to be somewhere in the call stack).
+   */
+  async previewSample(sampleId: string): Promise<void> {
+    if (!this.initialized) await this.init();
+    if (!this.context) return;
+    this.playBuffer(sampleId, "__preview__", this.context.currentTime, 0.85);
+  }
+
+  /**
+   * Short synthesised click for the metronome.
+   * accent = true on beat 1 of each bar (higher pitch).
+   */
+  playClick(time: number, accent: boolean): void {
+    if (!this.context || !this.masterGain || !this.initialized) return;
+    const ctx = this.context;
+    const freq = accent ? 1200 : 900;
+    const vol  = accent ? 0.35 : 0.2;
+    const osc  = ctx.createOscillator();
+    const env  = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = freq;
+    env.gain.setValueAtTime(vol, time);
+    env.gain.exponentialRampToValueAtTime(0.001, time + 0.04);
+    osc.connect(env);
+    env.connect(this.masterGain);
+    osc.start(time);
+    osc.stop(time + 0.05);
   }
 
   /**

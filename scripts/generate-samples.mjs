@@ -311,23 +311,163 @@ function generateRide() {
   return samples;
 }
 
+// ── NEW SAMPLES ──────────────────────────────────────────────────────────────
+
+function generateCrash() {
+  const dur = 1.2;
+  const n = Math.round(SAMPLE_RATE * dur);
+  const samples = new Float32Array(n);
+  let seed = 11111;
+  let prev1 = 0, prev2 = 0;
+  for (let i = 0; i < n; i++) {
+    seed = (seed * 1664525 + 1013904223) & 0xffffffff;
+    const noise = ((seed >>> 0) / 0xffffffff) * 2 - 1;
+    const hp1 = noise - prev1 * 0.55;
+    const hp2 = hp1 - prev2 * 0.45;
+    prev1 = noise; prev2 = hp1;
+    const t = i / SAMPLE_RATE;
+    const attack = Math.exp(-t * 5) * 0.65;
+    const sustain = Math.exp(-t * 1.8) * 0.35;
+    const metal = (Math.sin(2 * Math.PI * 7200 * t) * 0.12 + Math.sin(2 * Math.PI * 5400 * t) * 0.1) * Math.exp(-t * 6);
+    samples[i] = (hp2 * (attack + sustain) + metal) * 0.7;
+  }
+  return samples;
+}
+
+function generateConga() {
+  const dur = 0.35;
+  const n = Math.round(SAMPLE_RATE * dur);
+  const samples = new Float32Array(n);
+  const adsr = env(0.001, 0.025, 0.1, 0.32, n);
+  let seed = 22222;
+  let phase = 0;
+  for (let i = 0; i < n; i++) {
+    seed = (seed * 1664525 + 1013904223) & 0xffffffff;
+    const noise = ((seed >>> 0) / 0xffffffff) * 2 - 1;
+    const freq = 220 * Math.exp(-i / SAMPLE_RATE * 14) + 180;
+    phase += (2 * Math.PI * freq) / SAMPLE_RATE;
+    const slap = noise * Math.exp(-i / SAMPLE_RATE * 120) * 0.35;
+    samples[i] = (Math.sin(phase) * 0.65 + slap) * adsr(i) * 0.85;
+  }
+  return samples;
+}
+
+function generateSnap() {
+  const dur = 0.07;
+  const n = Math.round(SAMPLE_RATE * dur);
+  const samples = new Float32Array(n);
+  let seed = 33333;
+  for (let i = 0; i < n; i++) {
+    seed = (seed * 1664525 + 1013904223) & 0xffffffff;
+    const noise = ((seed >>> 0) / 0xffffffff) * 2 - 1;
+    const t = i / SAMPLE_RATE;
+    const mid = Math.sin(2 * Math.PI * 3200 * t) * 0.3;
+    samples[i] = (noise * 0.7 + mid) * Math.exp(-t * 90) * 0.9;
+  }
+  return samples;
+}
+
+function generateWoodblock() {
+  const dur = 0.15;
+  const n = Math.round(SAMPLE_RATE * dur);
+  const samples = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const t = i / SAMPLE_RATE;
+    const v = Math.sin(2 * Math.PI * 1200 * t) * 0.6
+            + Math.sin(2 * Math.PI * 1950 * t) * 0.4;
+    samples[i] = v * Math.exp(-t * 42) * 0.85;
+  }
+  return samples;
+}
+
+function generateTambourine() {
+  const dur = 0.35;
+  const n = Math.round(SAMPLE_RATE * dur);
+  const samples = new Float32Array(n);
+  let seed = 44444;
+  let prev = 0;
+  for (let i = 0; i < n; i++) {
+    seed = (seed * 1664525 + 1013904223) & 0xffffffff;
+    const noise = ((seed >>> 0) / 0xffffffff) * 2 - 1;
+    const t = i / SAMPLE_RATE;
+    const jingle = (Math.sin(2 * Math.PI * 8000 * t) * 0.2
+                  + Math.sin(2 * Math.PI * 11000 * t) * 0.15
+                  + Math.sin(2 * Math.PI * 6500 * t) * 0.15) * Math.exp(-t * 4);
+    const hp = noise - prev * 0.7;
+    prev = noise;
+    samples[i] = (hp * Math.exp(-t * 12) * 0.5 + jingle) * 0.75;
+  }
+  return samples;
+}
+
+function generateHiTom() {
+  const dur = 0.3;
+  const n = Math.round(SAMPLE_RATE * dur);
+  const samples = new Float32Array(n);
+  const adsr = env(0.001, 0.02, 0.1, 0.28, n);
+  let phase = 0;
+  for (let i = 0; i < n; i++) {
+    const freq = 260 * Math.exp(-i / SAMPLE_RATE * 10) + 190;
+    phase += (2 * Math.PI * freq) / SAMPLE_RATE;
+    samples[i] = Math.sin(phase) * adsr(i) * 0.85;
+  }
+  return samples;
+}
+
+function generateFloorTom() {
+  const dur = 0.55;
+  const n = Math.round(SAMPLE_RATE * dur);
+  const samples = new Float32Array(n);
+  const adsr = env(0.001, 0.04, 0.12, 0.51, n);
+  let phase = 0;
+  for (let i = 0; i < n; i++) {
+    const freq = 78 * Math.exp(-i / SAMPLE_RATE * 7) + 48;
+    phase += (2 * Math.PI * freq) / SAMPLE_RATE;
+    samples[i] = Math.sin(phase) * adsr(i) * 0.9;
+  }
+  return samples;
+}
+
+function generateLaser() {
+  const dur = 0.4;
+  const n = Math.round(SAMPLE_RATE * dur);
+  const samples = new Float32Array(n);
+  let phase = 0;
+  for (let i = 0; i < n; i++) {
+    const t = i / SAMPLE_RATE;
+    const freq = 1600 * Math.exp(-t * 10) + 120;
+    phase += (2 * Math.PI * freq) / SAMPLE_RATE;
+    samples[i] = Math.sin(phase) * Math.exp(-t * 4) * 0.8;
+  }
+  return samples;
+}
+
 const generators = [
-  ["kick.wav", generateKick],
-  ["snare.wav", generateSnare],
-  ["hat.wav", generateHat],
-  ["clap.wav", generateClap],
-  ["tom.wav", generateTom],
-  ["perc.wav", generatePerc],
-  ["bass.wav", generateBass],
-  ["synth.wav", generateSynth],
-  ["open-hat.wav", generateOpenHat],
-  ["rimshot.wav", generateRimshot],
-  ["shaker.wav", generateShaker],
-  ["cowbell.wav", generateCowbell],
-  ["sub.wav", generateSub],
-  ["chord.wav", generateChord],
-  ["fx.wav", generateFx],
-  ["ride.wav", generateRide],
+  ["kick.wav",       generateKick],
+  ["snare.wav",      generateSnare],
+  ["hat.wav",        generateHat],
+  ["clap.wav",       generateClap],
+  ["tom.wav",        generateTom],
+  ["perc.wav",       generatePerc],
+  ["bass.wav",       generateBass],
+  ["synth.wav",      generateSynth],
+  ["open-hat.wav",   generateOpenHat],
+  ["rimshot.wav",    generateRimshot],
+  ["shaker.wav",     generateShaker],
+  ["cowbell.wav",    generateCowbell],
+  ["sub.wav",        generateSub],
+  ["chord.wav",      generateChord],
+  ["fx.wav",         generateFx],
+  ["ride.wav",       generateRide],
+  // New samples
+  ["crash.wav",      generateCrash],
+  ["conga.wav",      generateConga],
+  ["snap.wav",       generateSnap],
+  ["woodblock.wav",  generateWoodblock],
+  ["tambourine.wav", generateTambourine],
+  ["hi-tom.wav",     generateHiTom],
+  ["floor-tom.wav",  generateFloorTom],
+  ["laser.wav",      generateLaser],
 ];
 
 for (const [filename, gen] of generators) {
