@@ -1,6 +1,7 @@
 import { type Pattern, serializePattern, deserializePattern } from "./pattern";
 
-const STORAGE_KEY = "bm:sessions";
+const STORAGE_KEY  = "bm:sessions";
+const AUTOSAVE_KEY = "bm:autosave";
 
 export interface SavedSession {
   id: string;
@@ -58,4 +59,26 @@ export function exportPatternJson(pattern: Pattern): void {
   a.download = `beatmachine-${Date.now()}.json`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+/** Persist both pattern slots so nothing is lost on reload */
+export function autoSavePatterns(slots: [Pattern, Pattern]): void {
+  try {
+    localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({
+      slot0: serializePattern(slots[0]),
+      slot1: serializePattern(slots[1]),
+    }));
+  } catch { /* storage full or unavailable */ }
+}
+
+/** Restore the last auto-saved state. Returns null if nothing was saved. */
+export function loadAutoSave(): [Pattern, Pattern] | null {
+  try {
+    const raw = localStorage.getItem(AUTOSAVE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw) as { slot0: string; slot1: string };
+    return [deserializePattern(data.slot0), deserializePattern(data.slot1)];
+  } catch {
+    return null;
+  }
 }

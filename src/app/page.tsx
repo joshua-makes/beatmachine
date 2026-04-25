@@ -18,6 +18,7 @@ import { noteFrequency, midiNoteNumber, getScaleMidiSet, type NoteName, type Sca
 import { sendDrumNote, sendMelodicNote } from "@/lib/audio/midi";
 import { EuclideanDialog } from "@/components/beat/EuclideanDialog";
 import { Tooltip } from "@/components/ui/Tooltip";
+import { autoSavePatterns, loadAutoSave } from "@/lib/session";
 
 export default function Home() {
   // Pattern A / B slots
@@ -74,18 +75,31 @@ export default function Home() {
   const dragIndexRef = useRef<number | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
 
+  // Loop range — [startStep, endStep] inclusive, 0-indexed. null = full loop.
+  const [loopRange, setLoopRange] = useState<[number, number] | null>(null);
+  const loopRangeRef = useRef<[number, number] | null>(null);
+
+  // Auto-save status toast
+  const [autoSavedAt, setAutoSavedAt] = useState<number | null>(null);
+
   // Piano / keyboard state
   const [pianoRoot,     setPianoRoot]     = useState<NoteName>("C");
   const [pianoScale,    setPianoScale]    = useState<ScaleName>("major");
   const [pianoOctave,   setPianoOctave]   = useState(3);
   /** Currently armed MIDI note — set when user clicks a piano key, painted into melody steps */
   const [selectedNote,  setSelectedNote]  = useState<number | null>(null);
+  /** Currently armed chord — set when user clicks a chord button, painted into melody steps */
+  const [selectedChord, setSelectedChord] = useState<number[] | null>(null);
+  /** Notes currently sounding during playback — used to light up piano keys */
+  const [playingNotes,  setPlayingNotes]  = useState<number[]>([]);
 
   const schedulerRef    = useRef<Scheduler | null>(null);
   const patternRef      = useRef<Pattern>(pattern);
   const tapTimesRef     = useRef<number[]>([]);
   const midiAccessRef   = useRef<MIDIAccess | null>(null);
   const midiOutputIdRef = useRef<string | null>(null);
+
+  useEffect(() => { loopRangeRef.current = loopRange; }, [loopRange]);
 
   useEffect(() => {
     patternRef.current = pattern;
@@ -100,13 +114,30 @@ export default function Home() {
   }, [chainActive]);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const s = params.get("s");
+    // Support both #s= (hash, new) and ?s= (query, legacy)
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    const queryParams = new URLSearchParams(window.location.search);
+    const s = hashParams.get("s") ?? queryParams.get("s");
     if (s) {
       const loaded = decodeShareUrl(s);
       setPattern(loaded);
+      return;
+    }
+    // No share URL — restore auto-save if available
+    const saved = loadAutoSave();
+    if (saved) {
+      setPatternSlots(saved);
     }
   }, []);
+
+  // Debounced auto-save: persist both slots on every change
+  useEffect(() => {
+    const t = setTimeout(() => {
+      autoSavePatterns(patternSlots);
+      setAutoSavedAt(Date.now());
+    }, 800);
+    return () => clearTimeout(t);
+  }, [patternSlots]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -181,6 +212,8 @@ export default function Home() {
     const p = patternRef.current;
     const engine = getEngine();
     const hasSolo = p.tracks.some((t) => t.solo);
+    const notesThisStep: number[] = [];
+    const humanize = p.humanize ?? 0;
     p.tracks.forEach((track) => {
       if (track.mute) return;
       if (hasSolo && !track.solo) return;
@@ -194,19 +227,32 @@ export default function Home() {
         const midi = track.notes?.[step];
         if (midi != null) {
           const dur = stepDurationSec(p.bpm) * 1.8;
-          engine.playToneAt(noteFrequency(midi), track.vol * 0.85, dur, time);
-          if (midiAccessRef.current && midiOutputIdRef.current) {
-            sendMelodicNote(midiAccessRef.current, midiOutputIdRef.current, midi, Math.round(track.vol * 85), Math.round(dur * 1000));
+          const octaveShift = (track.octaveOffset ?? 0) * 12;
+          const midiArr = Array.isArray(midi) ? midi : [midi];
+          const timeJitter = humanize > 0 ? (Math.random() - 0.3) * humanize * 0.0006 : 0;
+          const playTime = time + Math.max(0, timeJitter);
+          for (const m of midiArr) {
+            const shifted = m + octaveShift;
+            engine.playToneAt(noteFrequency(shifted), track.vol * 0.85, dur, playTime);
+            notesThisStep.push(shifted);
+            if (midiAccessRef.current && midiOutputIdRef.current) {
+              sendMelodicNote(midiAccessRef.current, midiOutputIdRef.current, shifted, Math.round(track.vol * 85), Math.round(dur * 1000));
+            }
           }
         }
       } else {
-        const vel = track.velocity?.[step] ?? 1.0;
-        engine.playBuffer(track.sampleId, track.id, time, vel);
+        const baseVel = track.velocity?.[step] ?? 1.0;
+        const velJitter = humanize > 0 ? (1 - Math.random() * humanize * 0.003) : 1;
+        const vel = Math.max(0.05, baseVel * velJitter);
+        const timeJitter = humanize > 0 ? (Math.random() - 0.3) * humanize * 0.0006 : 0;
+        engine.playBuffer(track.sampleId, track.id, time + Math.max(0, timeJitter), vel);
         if (midiAccessRef.current && midiOutputIdRef.current) {
           sendDrumNote(midiAccessRef.current, midiOutputIdRef.current, track.sampleId);
         }
       }
     });
+    // Update lit keys on piano keyboard
+    setPlayingNotes(notesThisStep);
   }, []);
 
   async function handleTogglePlay() {
@@ -218,6 +264,7 @@ export default function Home() {
       schedulerRef.current?.stop();
       setIsPlaying(false);
       setCurrentStep(null);
+      setPlayingNotes([]);
     } else {
       const ctx = engine.getAudioContext();
       if (!ctx) return;
@@ -227,6 +274,8 @@ export default function Home() {
         getStepCount: () => patternRef.current.stepCount,
         getSwing: () => patternRef.current.swing,
         getChain: () => chainActiveRef.current,
+        getLoopStart: () => loopRangeRef.current?.[0] ?? 0,
+        getLoopEnd: () => loopRangeRef.current?.[1] ?? (patternRef.current.stepCount - 1),
         onBarEnd: () => {
           // Flip between slot 0 and 1 at bar boundaries
           setActiveSlot((s) => (s === 0 ? 1 : 0));
@@ -290,6 +339,11 @@ export default function Home() {
           : t.velocity.slice(0, count),
       })),
     }));
+    // Clamp loop range to new step count
+    setLoopRange((r) => r
+      ? [Math.min(r[0], count - 1), Math.min(r[1], count - 1)]
+      : null
+    );
   }
 
   function handleTapTempo() {
@@ -301,6 +355,49 @@ export default function Home() {
       const avgMs = intervals.reduce((a, b) => a + b, 0) / intervals.length;
       handleBpmChange(Math.round(60000 / avgMs));
     }
+  }
+
+  function handleHumanizeChange(v: number) {
+    setPattern((prev) => ({ ...prev, humanize: v }));
+  }
+
+  function handleOctaveOffsetChange(trackIndex: number, offset: number) {
+    updateTrack(trackIndex, (t) => ({ ...t, octaveOffset: offset }));
+  }
+
+  function handleColorChange(trackIndex: number, color: string) {
+    updateTrack(trackIndex, (t) => ({ ...t, color }));
+  }
+
+  /** Click a step number while loop range is active to move the nearest endpoint */
+  function handleLoopStepClick(step: number) {
+    if (!loopRange) return;
+    const [s, e] = loopRange;
+    if (step < s) {
+      setLoopRange([step, e]);
+    } else if (step > e) {
+      setLoopRange([s, step]);
+    } else {
+      const mid = (s + e) / 2;
+      if (step <= mid) {
+        setLoopRange([step === e ? Math.max(0, step - 1) : step, e]);
+      } else {
+        setLoopRange([s, step === s ? Math.min(pattern.stepCount - 1, step + 1) : step]);
+      }
+    }
+  }
+
+  function handleReset() {
+    pushHistory();
+    setPattern((prev) => ({
+      ...prev,
+      tracks: prev.tracks.map((t) => ({
+        ...t,
+        steps: Array(prev.stepCount).fill(false) as boolean[],
+        notes: Array(prev.stepCount).fill(null),
+        velocity: Array(prev.stepCount).fill(1) as number[],
+      })),
+    }));
   }
 
   function handleClearTrack(trackIndex: number) {
@@ -353,11 +450,14 @@ export default function Home() {
   }
 
   function handleSetMelodyStep(trackIndex: number, step: number, value: boolean) {
-    const note = selectedNote ?? midiNoteNumber(pianoRoot, pianoOctave);
+    // Use armed chord if available, else armed note, else root of current octave
+    const noteValue: number | number[] | null = value
+      ? (selectedChord ?? selectedNote ?? midiNoteNumber(pianoRoot, pianoOctave))
+      : null;
     updateTrack(trackIndex, (t) => ({
       ...t,
       steps: t.steps.map((v, i) => (i === step ? value : v)),
-      notes: t.notes.map((n, i) => (i === step ? (value ? note : null) : n)),
+      notes: t.notes.map((n, i) => (i === step ? noteValue : n)),
     }));
   }
 
@@ -517,7 +617,8 @@ export default function Home() {
     const engine = getEngine();
     await engine.resume();
     engine.playTone(noteFrequency(midi), 0.8, 1.5);
-    setSelectedNote(midi);  // arm this note for melody step painting
+    setSelectedNote(midi);   // arm this note for melody step painting
+    setSelectedChord(null);  // clear any armed chord
     if (midiAccessRef.current && midiOutputIdRef.current) {
       sendMelodicNote(midiAccessRef.current, midiOutputIdRef.current, midi, 90, 500);
     }
@@ -530,6 +631,9 @@ export default function Home() {
     for (const midi of midiNotes) {
       engine.playTone(noteFrequency(midi), 0.6, 2.0);
     }
+    // Arm the chord for step painting
+    setSelectedChord(midiNotes);
+    setSelectedNote(null);
     if (midiAccessRef.current && midiOutputIdRef.current) {
       for (const midi of midiNotes) {
         sendMelodicNote(midiAccessRef.current, midiOutputIdRef.current, midi, 80, 600);
@@ -547,7 +651,7 @@ export default function Home() {
     midiOutputIdRef.current = null;
   }
 
-  function handleGrooveLoad(patch: Pick<Pattern, "bpm" | "tracks">) {
+  function handleGrooveLoad(patch: Pick<Pattern, "bpm" | "stepCount" | "tracks">) {
     pushHistory();
     setPattern((prev) => ({ ...prev, ...patch }));
   }
@@ -555,10 +659,51 @@ export default function Home() {
   return (
     <Container className="py-6 space-y-4">
 
+      {/* Easy / Advanced mode toggle — top of page, always visible */}
+      <div className={`flex items-center justify-between gap-3 rounded-xl border px-5 py-3 transition-colors ${
+        easyMode
+          ? "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800"
+          : "bg-indigo-50 dark:bg-indigo-950/30 border-indigo-200 dark:border-indigo-800"
+      }`}>
+        <div className="flex flex-col">
+          <span className={`text-sm font-bold ${
+            easyMode ? "text-emerald-700 dark:text-emerald-300" : "text-indigo-700 dark:text-indigo-300"
+          }`}>
+            {easyMode ? "🟢 Easy Mode" : "⚙️ Advanced Mode"}
+          </span>
+          <span className="text-xs text-ink-dim">
+            {easyMode ? "Simple beat making — great for getting started" : "Melody, swing, A/B patterns, chords & MIDI"}
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={() => setEasyMode((m) => !m)}
+          aria-pressed={easyMode}
+          className={`shrink-0 rounded-full border px-5 py-2 text-sm font-semibold transition-all active:scale-95 ${
+            easyMode
+              ? "bg-white dark:bg-emerald-900/40 border-emerald-400 dark:border-emerald-600 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/60"
+              : "bg-white dark:bg-indigo-900/40 border-indigo-400 dark:border-indigo-600 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/60"
+          }`}
+        >
+          {easyMode ? "Switch to Advanced" : "Switch to Easy"}
+        </button>
+      </div>
+
       {/* Groove presets — always shown */}
       <Card>
         <GroovePresets onLoad={handleGrooveLoad} />
       </Card>
+
+      {/* Empty-state nudge — shown when no steps are active yet */}
+      {!pattern.tracks.some((t) => t.steps.some(Boolean)) && (
+        <div className="flex items-center gap-3 rounded-xl border border-dashed border-indigo-300 dark:border-indigo-700/60 bg-indigo-50/60 dark:bg-indigo-950/20 px-5 py-3 text-sm text-indigo-600 dark:text-indigo-400">
+          <span className="text-2xl" aria-hidden="true">🎶</span>
+          <div>
+            <span className="font-semibold">Pick a groove above to get started</span>
+            <span className="hidden sm:inline text-ink-dim">, or tap any step in the grid below to begin building your beat.</span>
+          </div>
+        </div>
+      )}
 
       {/* Transport */}
       <Card>
@@ -571,6 +716,7 @@ export default function Home() {
           activeSlot={activeSlot}
           easyMode={easyMode}
           metronomeActive={metronomeActive}
+          humanize={pattern.humanize ?? 0}
           onTogglePlay={handleTogglePlay}
           onBpmChange={handleBpmChange}
           onMasterVolChange={handleMasterVolChange}
@@ -584,7 +730,7 @@ export default function Home() {
             setChainActive((c) => !c);
             chainActiveRef.current = !chainActiveRef.current;
           }}
-          onToggleEasy={() => setEasyMode((m) => !m)}
+          onHumanizeChange={handleHumanizeChange}
         />
       </Card>
 
@@ -598,6 +744,26 @@ export default function Home() {
         />
       </Card>
 
+      {/* Piano / Keyboard — advanced only */}
+      {!easyMode && (
+      <Card>
+        <PianoKeyboard
+          root={pianoRoot}
+          scale={pianoScale}
+          octave={pianoOctave}
+          selectedNote={selectedNote}
+          selectedChord={selectedChord}
+          activeNotes={playingNotes}
+          onRootChange={setPianoRoot}
+          onScaleChange={setPianoScale}
+          onOctaveChange={setPianoOctave}
+          onPlayNote={handlePlayNote}
+          onPlayChord={handlePlayChord}
+          onArmChord={(notes) => { setSelectedChord(notes.length ? notes : null); setSelectedNote(null); }}
+        />
+      </Card>
+      )}
+
       {/* Step sequencer */}
       <Card className="p-0">
         <div className="overflow-x-auto">
@@ -606,7 +772,7 @@ export default function Home() {
           <div className="flex items-center gap-3 px-2 py-2 border-b border-rim">
             {/* Spacer that matches the drag handle column (hidden on mobile like the handle) */}
             <div className="hidden sm:block w-5 shrink-0" aria-hidden="true" />
-            <div className="w-48 min-w-48 sm:w-60 sm:min-w-60 shrink-0 flex items-center gap-1">
+            <div className="w-48 min-w-48 sm:w-60 sm:min-w-60 shrink-0 flex items-center gap-1 flex-wrap">
               {/* Undo / Redo */}
               <Tooltip content="Undo (Ctrl+Z)">
                 <button
@@ -630,23 +796,61 @@ export default function Home() {
                   ↪
                 </button>
               </Tooltip>
+              <Tooltip content="Clear all steps (keeps tracks and settings)">
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  className="h-6 px-2 flex items-center justify-center rounded text-ink-ghost hover:text-rose-400 hover:bg-well text-xs transition-colors"
+                  aria-label="Reset all steps"
+                >
+                  ⦲ Reset
+                </button>
+              </Tooltip>
+              {/* Loop range toggle */}
+              <Tooltip content={loopRange
+                ? `Loop ${loopRange[0] + 1}–${loopRange[1] + 1} — click step numbers to adjust ends · click again to clear`
+                : "Loop range — constrain playback to a subset of steps"}>
+                <button
+                  type="button"
+                  onClick={() => setLoopRange(loopRange
+                    ? null
+                    : [0, Math.min(7, pattern.stepCount - 1)])}
+                  className={`h-6 px-2 flex items-center justify-center rounded text-xs font-mono transition-colors ${
+                    loopRange
+                      ? "text-indigo-400 bg-indigo-500/15 hover:bg-indigo-500/25"
+                      : "text-ink-ghost hover:text-ink hover:bg-well"
+                  }`}
+                  aria-pressed={!!loopRange}
+                  aria-label={loopRange ? `Clear loop range (${loopRange[0]+1}–${loopRange[1]+1})` : "Set loop range"}
+                >
+                  {loopRange ? `⟳ ${loopRange[0]+1}–${loopRange[1]+1}` : "⟳"}
+                </button>
+              </Tooltip>
             </div>
             <div className="flex gap-1">
               {Array.from({ length: pattern.stepCount }, (_, i) => (
                 <React.Fragment key={i}>
                   {i > 0 && i % 4 === 0 && <div className="w-1 sm:w-1.5 shrink-0" aria-hidden="true" />}
                   <div className="w-7 min-w-7 sm:w-8 sm:min-w-8 shrink-0 flex flex-col items-center gap-px">
-                    {/* Playhead pip — sweeps across columns when playing */}
+                    {/* Playhead pip / loop range indicator */}
                     <div className={`h-1 w-full rounded-sm transition-colors duration-75 ${
                       isPlaying && currentStep === i
                         ? "bg-emerald-400 shadow-[0_0_5px_1px_#34d399]"
-                        : "bg-transparent"
+                        : loopRange && i >= loopRange[0] && i <= loopRange[1]
+                          ? "bg-indigo-500/50"
+                          : "bg-transparent"
                     }`} aria-hidden="true" />
-                    <span className={`text-[9px] sm:text-[10px] font-mono ${
-                      isPlaying && currentStep === i
-                        ? "text-emerald-400 font-bold"
-                        : i % 4 === 3 ? "text-ink-dim" : "text-ink-ghost"
-                    }`}>
+                    {/* Step number — clickable when loop range is active to adjust endpoints */}
+                    <span
+                      onClick={loopRange ? () => handleLoopStepClick(i) : undefined}
+                      className={`text-[9px] sm:text-[10px] font-mono select-none ${loopRange ? "cursor-pointer" : ""} ${
+                        isPlaying && currentStep === i
+                          ? "text-emerald-400 font-bold"
+                          : loopRange && i >= loopRange[0] && i <= loopRange[1]
+                            ? "text-indigo-400 font-semibold"
+                            : i % 4 === 3 ? "text-ink-dim" : "text-ink-ghost"
+                      }`}
+                    >
                       {i % 4 === 3 ? i + 1 : "·"}
                     </span>
                   </div>
@@ -673,7 +877,7 @@ export default function Home() {
               trackIndex={i}
               currentStep={currentStep}
               isPlaying={isPlaying}
-              trackColor={TRACK_COLORS[i % TRACK_COLORS.length]}
+              trackColor={track.color ?? TRACK_COLORS[i % TRACK_COLORS.length]}
               selectedNote={selectedNote}
               easyMode={easyMode}
               canPaste={!!clipboardTrack}
@@ -708,6 +912,8 @@ export default function Home() {
               onRename={(name) => handleRenameTrack(i, name)}
               onEuclidean={() => setEuclidTrack(i)}
               onPreviewSample={(sampleId) => getEngine().previewSample(sampleId)}
+              onOctaveOffsetChange={(offset) => handleOctaveOffsetChange(i, offset)}
+              onColorChange={(color) => handleColorChange(i, color)}
             />
             </div>
           ))}
@@ -725,23 +931,6 @@ export default function Home() {
             </div>
           )}
         </div>        </div>      </Card>
-
-      {/* Piano / Keyboard — advanced only */}
-      {!easyMode && (
-      <Card>
-        <PianoKeyboard
-          root={pianoRoot}
-          scale={pianoScale}
-          octave={pianoOctave}
-          selectedNote={selectedNote}
-          onRootChange={setPianoRoot}
-          onScaleChange={setPianoScale}
-          onOctaveChange={setPianoOctave}
-          onPlayNote={handlePlayNote}
-          onPlayChord={handlePlayChord}
-        />
-      </Card>
-      )}
 
       {/* Record + Session — always shown */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -767,6 +956,17 @@ export default function Home() {
         <p className="text-center text-xs text-ink-dim pb-2">
           Press <kbd className="rounded bg-well border border-rim px-1.5 py-0.5 font-mono text-ink-dim">Space</kbd> or click Play to start the audio engine.
         </p>
+      )}
+
+      {/* Auto-save toast */}
+      {autoSavedAt && (
+        <div
+          key={autoSavedAt}
+          className="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-lg bg-panel border border-rim px-3 py-2 text-xs text-ink-dim shadow-lg animate-[fadeout_2.5s_ease-out_forwards]"
+          aria-live="polite"
+        >
+          <span aria-hidden="true">💾</span> Auto-saved
+        </div>
       )}
 
       {/* Euclidean rhythm dialog */}

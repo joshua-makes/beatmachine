@@ -6,6 +6,8 @@ import { Footer } from "@/components/layout/Footer";
 export const metadata: Metadata = {
   title: "GrooveWeaver – Browser Beat Maker",
   description: "A browser-based step sequencer and groove machine built with Web Audio API",
+  themeColor: "#6366f1",
+  appleWebApp: { capable: true, statusBarStyle: "black-translucent" },
 };
 
 // Anti-FOUC: runs synchronously before first paint to apply stored theme.

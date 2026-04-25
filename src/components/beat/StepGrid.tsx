@@ -1,5 +1,5 @@
 "use client";
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
 
 interface StepGridProps {
@@ -28,16 +28,49 @@ export function StepGrid({
   const activeColor = trackColor ?? "#6366f1";
   const activeGlow  = `${activeColor}55`;
   /** Tracks whether a paint drag is in progress and what value we're painting */
-  const paintRef = useRef<{ value: boolean } | null>(null);
+  const paintRef = useRef<{ value: boolean; lastStep: number } | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function stop() { paintRef.current = null; }
     window.addEventListener("pointerup", stop);
-    return () => window.removeEventListener("pointerup", stop);
+    window.addEventListener("touchend", stop);
+    return () => {
+      window.removeEventListener("pointerup", stop);
+      window.removeEventListener("touchend", stop);
+    };
+  }, []);
+
+  /** Find which step index is under a given client coordinate */
+  const stepAtPoint = useCallback((x: number, y: number): number | null => {
+    const el = document.elementFromPoint(x, y);
+    if (!el) return null;
+    // Walk up to find a button with data-step
+    let node: Element | null = el;
+    while (node && node !== containerRef.current) {
+      const s = (node as HTMLElement).dataset?.step;
+      if (s !== undefined) return parseInt(s, 10);
+      node = node.parentElement;
+    }
+    return null;
   }, []);
 
   return (
-    <div className="flex gap-1 select-none" role="group" aria-label={`Track ${trackIndex + 1} steps`}>
+    <div
+      ref={containerRef}
+      className="flex gap-1 select-none touch-none"
+      role="group"
+      aria-label={`Track ${trackIndex + 1} steps`}
+      onPointerMove={(e) => {
+        if (disabled || !paintRef.current) return;
+        const step = stepAtPoint(e.clientX, e.clientY);
+        if (step === null || step === paintRef.current.lastStep) return;
+        if (steps[step] !== paintRef.current.value) {
+          paintRef.current.lastStep = step;
+          onPaint(step, paintRef.current.value);
+        }
+      }}
+    >
       {steps.map((active, i) => {
         const label = noteLabels?.[i] ?? null;
         const vel   = velocities?.[i] ?? 1.0;
@@ -48,6 +81,7 @@ export function StepGrid({
             {i > 0 && i % 4 === 0 && <div className="w-1.5 shrink-0" aria-hidden="true" />}
             <button
               type="button"
+              data-step={i}
               aria-pressed={active}
               aria-label={label ? `${label} — Track ${trackIndex + 1} step ${i + 1}` : `Track ${trackIndex + 1} step ${i + 1}`}
               disabled={disabled}
@@ -60,14 +94,8 @@ export function StepGrid({
                 if (disabled || e.button !== 0) return;
                 e.preventDefault();
                 const newVal = !active;
-                paintRef.current = { value: newVal };
+                paintRef.current = { value: newVal, lastStep: i };
                 onPaintStart(i, newVal);
-              }}
-              onPointerEnter={() => {
-                if (disabled || !paintRef.current) return;
-                if (active !== paintRef.current.value) {
-                  onPaint(i, paintRef.current.value);
-                }
               }}
               onContextMenu={(e) => {
                 e.preventDefault();

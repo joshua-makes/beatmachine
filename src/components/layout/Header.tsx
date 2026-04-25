@@ -1,5 +1,6 @@
 import React from "react";
 import { ThemeToggle } from "./ThemeToggle";
+import { ShortcutsModal } from "@/components/beat/ShortcutsModal";
 
 export function Header() {
   return (
@@ -20,6 +21,7 @@ export function Header() {
         >
           GitHub
         </a>
+        <ShortcutsModal />
         <ThemeToggle />
       </nav>
     </header>

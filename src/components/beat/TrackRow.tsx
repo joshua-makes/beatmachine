@@ -6,6 +6,7 @@ import { SampleSelect } from "./SampleSelect";
 import { StepGrid } from "./StepGrid";
 import { Toggle } from "@/components/ui/Toggle";
 import { Tooltip } from "@/components/ui/Tooltip";
+import { TRACK_COLORS } from "@/lib/utils";
 
 /** Format MIDI note as e.g. "C4", "F#3" */
 function midiLabel(midi: number): string {
@@ -40,6 +41,8 @@ interface TrackRowProps {
   onRename: (name: string) => void;
   onEuclidean: () => void;
   onPreviewSample?: (sampleId: string) => void;
+  onOctaveOffsetChange?: (offset: number) => void;
+  onColorChange?: (color: string) => void;
 }
 
 export function TrackRow({
@@ -69,6 +72,8 @@ export function TrackRow({
   onRename,
   onEuclidean,
   onPreviewSample,
+  onOctaveOffsetChange,
+  onColorChange,
 }: TrackRowProps) {
   const isMelody = track.type === "melody";
   const [editingName, setEditingName] = useState(false);
@@ -77,7 +82,11 @@ export function TrackRow({
 
   // Build note labels for melody steps
   const noteLabels = isMelody
-    ? track.notes.map((midi) => (midi != null ? midiLabel(midi) : null))
+    ? track.notes.map((midi) => {
+        if (midi == null) return null;
+        if (Array.isArray(midi)) return (midi as number[]).map((m) => NOTE_NAMES[m % 12]).join("+");
+        return midiLabel(midi as number);
+      })
     : undefined;
 
   // Per-track probability (avg across all steps)
@@ -109,8 +118,21 @@ export function TrackRow({
 
       {/* Track controls */}
       <div className="flex items-center gap-1 sm:gap-1.5 w-48 min-w-48 sm:w-60 sm:min-w-60 shrink-0">
-        {/* Color strip */}
-        <div className="w-1 h-7 rounded-full shrink-0" style={{ backgroundColor: trackColor }} />
+        {/* Color strip — click to cycle through palette */}
+        <Tooltip content="Click to change track color">
+          <button
+            type="button"
+            onClick={() => {
+              if (!onColorChange) return;
+              const idx = TRACK_COLORS.indexOf(trackColor as typeof TRACK_COLORS[number]);
+              const next = TRACK_COLORS[(idx + 1) % TRACK_COLORS.length];
+              onColorChange(next);
+            }}
+            className="w-1 h-7 rounded-full shrink-0 cursor-pointer hover:scale-125 transition-transform"
+            style={{ backgroundColor: trackColor }}
+            aria-label="Change track color"
+          />
+        </Tooltip>
 
         {/* Track number / inline rename */}
         {editingName ? (
@@ -156,7 +178,7 @@ export function TrackRow({
         )}
 
         {isMelody ? (
-          <div className="flex flex-col min-w-0 flex-1">
+          <div className="flex flex-col min-w-0 flex-1 gap-0.5">
             <span className="text-[11px] font-semibold text-indigo-400 leading-tight">Melody</span>
             {selectedNote !== null ? (
               <span className="text-[9px] text-emerald-400 font-mono leading-tight">
@@ -164,6 +186,28 @@ export function TrackRow({
               </span>
             ) : (
               <span className="text-[9px] text-ink-ghost leading-tight">click a key to arm</span>
+            )}
+            {/* Octave offset control for melody tracks */}
+            {onOctaveOffsetChange && (
+              <div className="flex items-center gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => onOctaveOffsetChange(Math.max(-3, (track.octaveOffset ?? 0) - 1))}
+                  disabled={(track.octaveOffset ?? 0) <= -3}
+                  className="h-3.5 w-3.5 flex items-center justify-center rounded text-[9px] text-ink-ghost hover:text-ink hover:bg-well transition-colors disabled:opacity-30"
+                  aria-label="Octave down"
+                >−</button>
+                <span className="text-[9px] font-mono text-ink-dim w-7 text-center">
+                  {(track.octaveOffset ?? 0) === 0 ? "oct" : `oct${(track.octaveOffset ?? 0) > 0 ? "+" : ""}${track.octaveOffset ?? 0}`}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onOctaveOffsetChange(Math.min(3, (track.octaveOffset ?? 0) + 1))}
+                  disabled={(track.octaveOffset ?? 0) >= 3}
+                  className="h-3.5 w-3.5 flex items-center justify-center rounded text-[9px] text-ink-ghost hover:text-ink hover:bg-well transition-colors disabled:opacity-30"
+                  aria-label="Octave up"
+                >+</button>
+              </div>
             )}
           </div>
         ) : (

@@ -30,6 +30,10 @@ export interface SchedulerOptions {
   onBarEnd?: () => void;
   /** Whether chain A→B is active — reads each tick so toggling takes effect next bar */
   getChain?: () => boolean;
+  /** First step to play in loop range (inclusive, 0-indexed). Defaults to 0. */
+  getLoopStart?: () => number;
+  /** Last step to play in loop range (inclusive, 0-indexed). Defaults to stepCount-1. */
+  getLoopEnd?: () => number;
 }
 
 export class Scheduler {
@@ -40,6 +44,8 @@ export class Scheduler {
   private onStep: (step: number, time: number) => void;
   private onBarEnd?: () => void;
   private getChain?: () => boolean;
+  private getLoopStart?: () => number;
+  private getLoopEnd?: () => number;
   private currentStep = 0;
   private nextNoteTime = 0;
   private intervalId: ReturnType<typeof setInterval> | null = null;
@@ -54,9 +60,12 @@ export class Scheduler {
     this.onStep = options.onStep;
     this.onBarEnd = options.onBarEnd;
     this.getChain = options.getChain;
+    this.getLoopStart = options.getLoopStart;
+    this.getLoopEnd = options.getLoopEnd;
   }
 
   start() {
+    this.currentStep = this.getLoopStart?.() ?? 0;
     this.nextNoteTime = this.audioContext.currentTime;
     this.intervalId = setInterval(() => this.tick(), this.lookaheadMs);
   }
@@ -80,10 +89,12 @@ export class Scheduler {
       this.nextNoteTime += stepDur * (isEven ? 1 + swingAmt : 1 - swingAmt);
 
       const stepCount = this.getStepCount();
+      const loopStart = this.getLoopStart?.() ?? 0;
+      const loopEnd   = Math.min(this.getLoopEnd?.() ?? stepCount - 1, stepCount - 1);
+
       this.currentStep++;
-      // At bar end: if chain is active, fire onBarEnd so caller can flip slot
-      if (this.currentStep >= stepCount) {
-        this.currentStep = 0;
+      if (this.currentStep > loopEnd || this.currentStep >= stepCount) {
+        this.currentStep = loopStart;
         if (this.getChain?.() && this.onBarEnd) {
           this.onBarEnd();
         }

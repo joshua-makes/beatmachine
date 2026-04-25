@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/Button";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { type Pattern } from "@/lib/pattern";
 import { saveSession, loadSessions, deleteSession, getSessionPattern, exportPatternJson, type SavedSession } from "@/lib/session";
+import { exportPatternMidi } from "@/lib/audio/midiExport";
 import { buildShareLink } from "@/lib/pattern";
 
 interface SessionMenuProps {
@@ -41,6 +42,8 @@ export function SessionMenu({ pattern, onLoad }: SessionMenuProps) {
   function handleShare() {
     const link = buildShareLink(pattern, window.location.origin + window.location.pathname);
     setShareLink(link);
+    // Update the browser URL bar so the current URL is already shareable
+    window.history.replaceState(null, "", `#s=${link.split("#s=")[1]}`);
     navigator.clipboard.writeText(link).catch(() => {});
   }
 
@@ -91,6 +94,9 @@ export function SessionMenu({ pattern, onLoad }: SessionMenuProps) {
         <Tooltip content="Generate shareable URL — pattern is encoded and copied to clipboard">
           <Button variant="ghost" size="sm" onClick={handleShare}>Share Link</Button>
         </Tooltip>
+        <Tooltip content="Download pattern as MIDI — open in GarageBand, Ableton, or any DAW">
+          <Button variant="ghost" size="sm" onClick={() => exportPatternMidi(pattern)}>Export MIDI</Button>
+        </Tooltip>
         <Tooltip content="Download the current pattern as a .json file">
           <Button variant="ghost" size="sm" onClick={() => exportPatternJson(pattern)}>Export JSON</Button>
         </Tooltip>
@@ -105,9 +111,13 @@ export function SessionMenu({ pattern, onLoad }: SessionMenuProps) {
       </div>
 
       {shareLink && (
-        <p className="mt-2 text-xs text-indigo-400 break-all" aria-live="polite">
-          Copied! {shareLink.slice(0, 60)}…
-        </p>
+        <div className="mt-2 flex items-start gap-2 rounded-lg bg-indigo-500/10 border border-indigo-500/30 px-3 py-2">
+          <span className="text-indigo-400 text-base shrink-0" aria-hidden="true">🔗</span>
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-indigo-300">Copied to clipboard!</p>
+            <p className="text-[10px] text-ink-dim break-all mt-0.5 font-mono">{shareLink.slice(0, 72)}{shareLink.length > 72 ? "…" : ""}</p>
+          </div>
+        </div>
       )}
 
       {showSessions && (

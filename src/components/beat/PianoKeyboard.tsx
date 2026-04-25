@@ -46,11 +46,17 @@ interface PianoKeyboardProps {
   octave: number;
   /** Currently armed MIDI note (shown with emerald ring on the keyboard key) */
   selectedNote?: number | null;
+  /** Currently armed chord — shown with amber ring on chord button */
+  selectedChord?: number[] | null;
+  /** Notes currently sounding during playback — lit up on keyboard */
+  activeNotes?: number[];
   onRootChange: (root: NoteName) => void;
   onScaleChange: (scale: ScaleName) => void;
   onOctaveChange: (octave: number) => void;
   onPlayNote: (midi: number) => void;
   onPlayChord: (midiNotes: number[]) => void;
+  /** Arm a chord for step painting (also plays it) */
+  onArmChord?: (midiNotes: number[]) => void;
 }
 
 export function PianoKeyboard({
@@ -58,17 +64,22 @@ export function PianoKeyboard({
   scale,
   octave,
   selectedNote,
+  selectedChord,
+  activeNotes,
   onRootChange,
   onScaleChange,
   onOctaveChange,
   onPlayNote,
   onPlayChord,
+  onArmChord,
 }: PianoKeyboardProps) {
   const scaleMidi = getScaleMidiSet(root, scale);
   const rootChromatic = NOTE_NAMES.indexOf(root);
   const chords = getDiatonicChords(root, scale, octave);
 
   function whiteKeyClass(midi: number) {
+    if (activeNotes?.includes(midi))
+      return "bg-emerald-300 dark:bg-emerald-400 active:bg-emerald-400";
     const isRoot  = midi % 12 === rootChromatic;
     const inScale = scaleMidi.has(midi);
     if (isRoot && inScale)
@@ -79,6 +90,7 @@ export function PianoKeyboard({
   }
 
   function blackKeyClass(midi: number) {
+    if (activeNotes?.includes(midi)) return "bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-300";
     const isRoot  = midi % 12 === rootChromatic;
     const inScale = scaleMidi.has(midi);
     if (isRoot && inScale) return "bg-indigo-500 hover:bg-indigo-400 active:bg-indigo-300";
@@ -203,21 +215,23 @@ export function PianoKeyboard({
               {/* White keys */}
               {WHITE_KEY_OFFSETS.map((offset) => {
                 const midi = (oct + 1) * 12 + offset;
-                const isArmed = midi === selectedNote;
+                const isArmed   = midi === selectedNote;
+                const isPlaying = activeNotes?.includes(midi);
                 return (
                   <button
                     key={offset}
                     type="button"
                     onPointerDown={(e) => { e.preventDefault(); onPlayNote(midi); }}
                     aria-label={`${NOTE_NAMES[offset]}${oct}`}
-                    className={`flex-1 h-full border-r border-zinc-300 dark:border-zinc-500 transition-colors select-none rounded-b-sm ${whiteKeyClass(midi)} ${isArmed ? "ring-2 ring-inset ring-emerald-400 z-10 relative" : ""}`}
+                    className={`flex-1 h-full border-r border-zinc-300 dark:border-zinc-500 transition-colors select-none rounded-b-sm ${whiteKeyClass(midi)} ${isArmed ? "ring-2 ring-inset ring-emerald-500 z-10 relative" : ""} ${isPlaying && !isArmed ? "ring-2 ring-inset ring-emerald-400 z-10 relative" : ""}`}
                   />
                 );
               })}
               {/* Black keys (absolutely positioned) */}
               {BLACK_KEYS.map(({ offset, leftPct }) => {
                 const midi = (oct + 1) * 12 + offset;
-                const isArmed = midi === selectedNote;
+                const isArmed   = midi === selectedNote;
+                const isPlaying = activeNotes?.includes(midi);
                 return (
                   <button
                     key={offset}
@@ -225,7 +239,7 @@ export function PianoKeyboard({
                     onPointerDown={(e) => { e.preventDefault(); onPlayNote(midi); }}
                     aria-label={`${NOTE_NAMES[offset]}${oct}`}
                     style={{ left: `${leftPct}%`, width: "8.57%", height: "60%", top: 0 }}
-                    className={`absolute z-10 rounded-b-sm transition-colors select-none ${blackKeyClass(midi)} ${isArmed ? "ring-2 ring-emerald-400 z-20" : ""}`}
+                    className={`absolute z-10 rounded-b-sm transition-colors select-none ${blackKeyClass(midi)} ${isArmed || isPlaying ? "ring-2 ring-emerald-400 z-20" : ""}`}
                   />
                 );
               })}
@@ -251,31 +265,56 @@ export function PianoKeyboard({
           <span className="text-xs font-semibold uppercase tracking-widest text-ink-dim">
             Chords
           </span>
-          {chords.map((chord, i) => (
-            <Tooltip
-              key={i}
-              content={`${chord.degree} — ${chord.label}  (${chord.midiNotes.map(midiToName).join(" ")})`}
-            >
-              <button
-                type="button"
-                onPointerDown={(e) => { e.preventDefault(); onPlayChord(chord.midiNotes); }}
-                className={`rounded-lg px-2.5 py-1 text-xs font-semibold border transition-colors ${
-                  chord.quality === "maj"
-                    ? "bg-indigo-600/20 border-indigo-500/40 text-indigo-400 hover:bg-indigo-600/30"
-                    : chord.quality === "min"
-                    ? "bg-zinc-700/30 border-zinc-600/50 text-ink-dim hover:bg-zinc-700/50"
-                    : chord.quality === "dim"
-                    ? "bg-red-900/20 border-red-700/40 text-red-400 hover:bg-red-900/30"
-                    : chord.quality === "aug"
-                    ? "bg-amber-900/20 border-amber-700/40 text-amber-400 hover:bg-amber-900/30"
-                    : "bg-well border-rim text-ink-dim hover:bg-rim"
-                }`}
+          {/* Armed chord indicator */}
+          {selectedChord && selectedChord.length > 0 && (
+            <span className="text-xs font-mono bg-amber-500/20 border border-amber-500/50 text-amber-400 rounded px-2 py-0.5">
+              armed: {selectedChord.map((m) => NOTE_NAMES[m % 12]).join("+")}
+            </span>
+          )}
+          {chords.map((chord, i) => {
+            const isArmed = selectedChord != null &&
+              selectedChord.length === chord.midiNotes.length &&
+              chord.midiNotes.every((n, j) => n === selectedChord[j]);
+            return (
+              <Tooltip
+                key={i}
+                content={`${chord.degree} — ${chord.label}  (${chord.midiNotes.map(midiToName).join(" ")})`}
               >
-                <span className="text-[9px] font-mono mr-0.5 opacity-60">{chord.degree}</span>
-                {chord.label}
-              </button>
-            </Tooltip>
-          ))}
+                <button
+                  type="button"
+                  onPointerDown={(e) => { e.preventDefault(); onPlayChord(chord.midiNotes); onArmChord?.(chord.midiNotes); }}
+                  aria-pressed={isArmed}
+                  className={`rounded-lg px-2.5 py-1 text-xs font-semibold border transition-colors ${
+                    isArmed
+                      ? "bg-amber-500/30 border-amber-400 text-amber-300 ring-1 ring-amber-400"
+                      : chord.quality === "maj"
+                      ? "bg-indigo-600/20 border-indigo-500/40 text-indigo-400 hover:bg-indigo-600/30"
+                      : chord.quality === "min"
+                      ? "bg-zinc-700/30 border-zinc-600/50 text-ink-dim hover:bg-zinc-700/50"
+                      : chord.quality === "dim"
+                      ? "bg-red-900/20 border-red-700/40 text-red-400 hover:bg-red-900/30"
+                      : chord.quality === "aug"
+                      ? "bg-amber-900/20 border-amber-700/40 text-amber-400 hover:bg-amber-900/30"
+                      : "bg-well border-rim text-ink-dim hover:bg-rim"
+                  }`}
+                >
+                  <span className="text-[9px] font-mono mr-0.5 opacity-60">{chord.degree}</span>
+                  {chord.label}
+                </button>
+              </Tooltip>
+            );
+          })}
+          {/* Dismiss armed chord */}
+          {selectedChord && selectedChord.length > 0 && (
+            <button
+              type="button"
+              onClick={() => onArmChord?.([])}
+              className="text-xs text-ink-ghost hover:text-ink-dim px-1"
+              title="Clear armed chord"
+            >
+              × clear
+            </button>
+          )}
         </div>
       )}
     </div>

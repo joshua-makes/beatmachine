@@ -11,12 +11,16 @@ export interface TrackState {
   mute: boolean;
   solo: boolean;
   steps: boolean[];
-  /** MIDI note number per step — only used by melody tracks */
-  notes: (number | null)[];
+  /** MIDI note number per step — single note or chord array. Only used by melody tracks. */
+  notes: (number | number[] | null)[];
   /** Per-step velocity 0–1 (default 1.0). Right-click active steps to cycle soft/ghost. */
   velocity: number[];
   /** Per-step fire probability 0–1 (default 1.0). 1 = always fires, 0.5 = 50% chance. */
   probability: number[];
+  /** Octave transpose for melody tracks: -3 to +3. Default 0. */
+  octaveOffset?: number;
+  /** Custom track color hex string. Falls back to palette color when absent. */
+  color?: string;
 }
 
 export interface Pattern {
@@ -25,6 +29,8 @@ export interface Pattern {
   stepCount: 8 | 16 | 32 | 64;
   /** 0 = straight, 100 = max swing (~2:1 triplet feel) */
   swing: number;
+  /** 0 = robotic perfect timing, 100 = heavy human feel (timing + velocity variation) */
+  humanize: number;
   tracks: TrackState[];
 }
 
@@ -39,6 +45,7 @@ export function createDefaultPattern(): Pattern {
     masterVol: 0.8,
     stepCount: 16,
     swing: 0,
+    humanize: 0,
     tracks: Array.from({ length: TRACK_COUNT }, (_, i) => ({
       id: `track-${i}`,
       sampleId: DEFAULT_SAMPLES[i] ?? "kick",
@@ -65,6 +72,7 @@ export function deserializePattern(data: string): Pattern {
     // Back-compat: fill in fields added after initial release
     const raw = parsed as unknown as Record<string, unknown>;
     if (typeof raw.swing !== "number") raw.swing = 0;
+    if (typeof raw.humanize !== "number") raw.humanize = 0;
     // Back-compat: ensure each track has type + notes fields
     if (Array.isArray(raw.tracks)) {
       raw.tracks = (raw.tracks as Array<Record<string, unknown>>).map((t) => ({
@@ -107,5 +115,6 @@ export function decodeShareUrl(encoded: string): Pattern {
 
 export function buildShareLink(pattern: Pattern, baseUrl: string): string {
   const encoded = encodeShareUrl(pattern);
-  return `${baseUrl}?s=${encoded}`;
+  // Use hash fragment — never sent to server, works for static deployments
+  return `${baseUrl}#s=${encoded}`;
 }
