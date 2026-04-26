@@ -964,6 +964,7 @@ export default function Home() {
               easyMode={easyMode}
               canPaste={!!clipboardTrack}
               teachMode={teachMode}
+              stepCount={pattern.stepCount}
               onDragHandlePointerDown={() => handleDragStart(i)}
               onPaintStart={(step, value) => {
                 pushHistory();

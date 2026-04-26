@@ -1,112 +1,132 @@
 "use client";
 import React from "react";
 
-/**
- * NotationStrip — Teach Me panel shown below a track's step grid.
- *
- * Shows each step's rhythmic "name" so kids can connect the grid to music theory:
- *   • Step number inside beats (1, e, +, a  per beat — standard counting syllables)
- *   • Infers approximate note value from runs of consecutive active steps
- *   • Shows beat groupings and a concise legend
- */
-
 interface NotationStripProps {
   steps: boolean[];
   currentStep: number | null;
   isPlaying: boolean;
+  stepCount: number;
 }
 
-/** Standard counting syllables for 16th-note positions within a beat */
-const BEAT_SYLLABLES = ["1", "e", "+", "a", "2", "e", "+", "a", "3", "e", "+", "a", "4", "e", "+", "a"];
+type NoteLen = "whole" | "half" | "quarter" | "eighth" | "sixteenth";
 
-/** Beat number (1-4) for a step index */
-function beatOf(step: number) { return Math.floor(step / 4) + 1; }
+function runLength(steps: boolean[], from: number): number {
+  let n = 0;
+  for (let i = from; i < steps.length && steps[i]; i++) n++;
+  return n;
+}
 
-/** Infer approximate note value for a run of consecutive active steps.
- *  Returns a label + color class. */
-function inferNoteValue(steps: boolean[], i: number): { symbol: string; label: string; color: string } | null {
+function noteLen(steps: boolean[], i: number): NoteLen | null {
   if (!steps[i]) return null;
-  // Count the run of active steps starting at i (not before)
-  let run = 0;
-  for (let j = i; j < steps.length && steps[j]; j++) run++;
-
-  // Also count backwards to see if we're inside a longer run
-  let before = 0;
-  for (let j = i - 1; j >= 0 && steps[j]; j--) before++;
-
-  const totalRun = before + run;
-
-  if (totalRun >= 16) return { symbol: "𝅝", label: "Whole note", color: "text-purple-400" };
-  if (totalRun >= 8)  return { symbol: "𝅗𝅥", label: "Half note",  color: "text-blue-400" };
-  if (totalRun >= 4)  return { symbol: "♩",  label: "Quarter note", color: "text-emerald-400" };
-  if (totalRun >= 2)  return { symbol: "♪",  label: "Eighth note",  color: "text-amber-400" };
-  return                      { symbol: "♬",  label: "16th note",    color: "text-rose-400" };
+  const r = runLength(steps, i);
+  if (r >= 16) return "whole";
+  if (r >= 8)  return "half";
+  if (r >= 4)  return "quarter";
+  if (r >= 2)  return "eighth";
+  return "sixteenth";
 }
 
-const NOTE_LEGEND = [
-  { symbol: "♬", label: "16th note — very quick", color: "text-rose-400" },
-  { symbol: "♪",  label: "8th note — quick",       color: "text-amber-400" },
-  { symbol: "♩",  label: "Quarter note — 1 beat",  color: "text-emerald-400" },
-  { symbol: "𝅗𝅥", label: "Half note — 2 beats",    color: "text-blue-400" },
-  { symbol: "𝅝",  label: "Whole note — 4 beats",   color: "text-purple-400" },
+/** Human counting syllable for step i.
+ *  16-step grid: 1 e + a 2 e + a …
+ *  32-step grid: beat number on 0, "+" on 4, blank otherwise */
+function syllable(i: number, stepCount: number): string {
+  if (stepCount <= 16) {
+    const beat = Math.floor(i / 4) + 1;
+    const sub  = i % 4;
+    return sub === 0 ? `${beat}` : sub === 1 ? "e" : sub === 2 ? "+" : "a";
+  }
+  const beat = Math.floor(i / 8) + 1;
+  const sub  = i % 8;
+  return sub === 0 ? `${beat}` : sub === 4 ? "+" : "";
+}
+
+const DOT_CLASS: Record<NoteLen, string> = {
+  whole:     "w-5 h-5 rounded-full",
+  half:      "w-4 h-4 rounded-full",
+  quarter:   "w-3.5 h-3.5 rounded-full",
+  eighth:    "w-2.5 h-2.5 rounded-full",
+  sixteenth: "w-1.5 h-1.5 rounded-full",
+};
+
+const DOT_BG: Record<NoteLen, string> = {
+  whole:     "bg-violet-400",
+  half:      "bg-blue-400",
+  quarter:   "bg-emerald-400",
+  eighth:    "bg-amber-400",
+  sixteenth: "bg-rose-400",
+};
+
+const DOT_TITLE: Record<NoteLen, string> = {
+  whole:     "Whole note — 4 beats",
+  half:      "Half note — 2 beats",
+  quarter:   "Quarter note — 1 beat",
+  eighth:    "Eighth note — half a beat",
+  sixteenth: "16th note — very quick!",
+};
+
+const LEGEND: [NoteLen, string][] = [
+  ["whole",     "Whole — 4 beats"],
+  ["half",      "Half — 2 beats"],
+  ["quarter",   "Quarter — 1 beat"],
+  ["eighth",    "Eighth — ½ beat"],
+  ["sixteenth", "16th — very quick"],
 ];
 
-export function NotationStrip({ steps, currentStep, isPlaying }: NotationStripProps) {
-  const count = steps.length;
-  // Clamp to at most 32 steps for display; for 64 steps show in groups of 4 still
-  const showSteps = Math.min(count, 32);
+export function NotationStrip({ steps, currentStep, isPlaying, stepCount }: NotationStripProps) {
+  const show = Math.min(steps.length, 32);
 
   return (
-    <div className="mt-1 mb-2 rounded-lg bg-well/60 border border-rim px-2 pt-1.5 pb-2">
-      {/* Header */}
-      <p className="text-[9px] font-semibold uppercase tracking-widest text-ink-dim mb-1.5">
-        🎓 Teach Me — note values
+    <div className="mb-2 rounded-lg bg-well/50 border border-rim/60 px-2 pt-2 pb-2.5 overflow-x-auto">
+      <p className="text-[9px] font-semibold uppercase tracking-widest text-ink-dim mb-1.5 select-none">
+        🎓 Rhythm guide
       </p>
 
-      {/* Beat groupings row */}
+      {/* Cell row — mirrors StepGrid spacing exactly */}
       <div className="flex gap-1">
-        {Array.from({ length: showSteps }, (_, i) => {
-          const active = steps[i];
+        {Array.from({ length: show }, (_, i) => {
+          const active    = steps[i];
           const isCurrent = isPlaying && currentStep === i;
-          const nv = inferNoteValue(steps, i);
-          const syl = BEAT_SYLLABLES[i % 16] ?? String(i + 1);
-          const beatStart = i % 4 === 0;
+          const nl        = noteLen(steps, i);
+          const syl       = syllable(i, stepCount);
+          const onBeat    = i % 4 === 0;
+          const andBeat   = i % 4 === 2;
 
           return (
             <React.Fragment key={i}>
-              {i > 0 && beatStart && (
-                <div className="w-px bg-rim shrink-0 self-stretch" aria-hidden="true" />
+              {/* Same beat-group spacer as StepGrid */}
+              {i > 0 && i % 4 === 0 && (
+                <div className="w-1.5 shrink-0" aria-hidden="true" />
               )}
               <div
-                className={`flex flex-col items-center gap-0.5 w-7 min-w-7 sm:w-8 sm:min-w-8 shrink-0`}
-                title={nv ? `${nv.label} — beat ${beatOf(i)}, "${syl}"` : `Beat ${beatOf(i)}, "${syl}" (rest)`}
+                className="flex flex-col items-center justify-end gap-0.5 w-7 min-w-7 sm:w-8 sm:min-w-8 shrink-0"
+                title={nl ? DOT_TITLE[nl] : undefined}
               >
-                {/* Note symbol */}
-                <span className={`text-sm leading-none select-none ${
-                  active
-                    ? (nv?.color ?? "text-emerald-400")
-                    : "text-ink-ghost"
-                } ${isCurrent ? "scale-125 inline-block" : ""}`} aria-hidden="true">
-                  {active && nv ? nv.symbol : "·"}
-                </span>
+                {/* Dot: size = note length, colour = note family */}
+                <div className="flex items-center justify-center h-5 w-full">
+                  {active && nl ? (
+                    <div
+                      className={`${DOT_CLASS[nl]} ${DOT_BG[nl]} transition-transform ${
+                        isCurrent ? "scale-125 ring-2 ring-white ring-offset-1 ring-offset-zinc-900" : ""
+                      }`}
+                    />
+                  ) : (
+                    <div className="w-1 h-1 rounded-full bg-rim opacity-40" />
+                  )}
+                </div>
 
-                {/* Counting syllable */}
-                <span className={`text-[8px] sm:text-[9px] font-mono leading-none select-none ${
-                  isCurrent
-                    ? "text-emerald-400 font-bold"
-                    : active
-                      ? "text-ink-dim font-semibold"
-                      : "text-ink-ghost"
-                }`}>
-                  {syl}
-                </span>
-
-                {/* Beat number dot (only on beat 1 of each group) */}
-                {beatStart && (
-                  <span className={`text-[7px] font-bold leading-none select-none ${
-                    isCurrent && i % 4 === 0 ? "text-emerald-400" : "text-ink-ghost"
-                  }`}>
-                    {beatOf(i)}
+                {/* Counting label */}
+                {syl && (
+                  <span className={[
+                    "text-[8px] sm:text-[9px] font-mono leading-none select-none",
+                    isCurrent
+                      ? "text-white font-bold"
+                      : onBeat
+                        ? (active ? "text-emerald-400 font-bold" : "text-ink-dim font-bold")
+                        : andBeat
+                          ? (active ? "text-amber-400" : "text-ink-ghost")
+                          : (active ? "text-ink-dim" : "text-ink-ghost/50"),
+                  ].join(" ")}>
+                    {syl}
                   </span>
                 )}
               </div>
@@ -116,11 +136,11 @@ export function NotationStrip({ steps, currentStep, isPlaying }: NotationStripPr
       </div>
 
       {/* Legend */}
-      <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5">
-        {NOTE_LEGEND.map((n) => (
-          <span key={n.symbol} className="flex items-center gap-0.5 text-[9px] text-ink-dim">
-            <span className={`text-xs ${n.color}`} aria-hidden="true">{n.symbol}</span>
-            {n.label}
+      <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-2 pt-1.5 border-t border-rim/40">
+        {LEGEND.map(([nl, label]) => (
+          <span key={nl} className="flex items-center gap-1 text-[9px] text-ink-dim select-none">
+            <span className={`inline-block ${DOT_CLASS[nl]} ${DOT_BG[nl]} shrink-0`} />
+            {label}
           </span>
         ))}
       </div>

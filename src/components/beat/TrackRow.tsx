@@ -45,6 +45,7 @@ interface TrackRowProps {
   onOctaveOffsetChange?: (offset: number) => void;
   onColorChange?: (color: string) => void;
   teachMode?: boolean;
+  stepCount?: number;
 }
 
 export function TrackRow({
@@ -77,6 +78,7 @@ export function TrackRow({
   onOctaveOffsetChange,
   onColorChange,
   teachMode = false,
+  stepCount,
 }: TrackRowProps) {
   const isMelody = track.type === "melody";
   const [editingName, setEditingName] = useState(false);
@@ -215,16 +217,18 @@ export function TrackRow({
           </div>
         ) : (
           <>
-            <SampleSelect
-              value={track.sampleId}
-              trackIndex={trackIndex}
-              onChange={(sampleId) => {
-                onChangeSample(sampleId);
-                onPreviewSample?.(sampleId);
-              }}
-            />
+            <Tooltip content="Choose which drum or instrument sound this track plays">
+              <SampleSelect
+                value={track.sampleId}
+                trackIndex={trackIndex}
+                onChange={(sampleId) => {
+                  onChangeSample(sampleId);
+                  onPreviewSample?.(sampleId);
+                }}
+              />
+            </Tooltip>
             {onPreviewSample && (
-              <Tooltip content={`Preview: ${track.sampleId}`}>
+              <Tooltip content={`Hear the sound: ${track.sampleId}`}>
                 <button
                   type="button"
                   onClick={() => onPreviewSample(track.sampleId)}
@@ -257,6 +261,7 @@ export function TrackRow({
             steps={track.steps}
             currentStep={isPlaying ? currentStep : null}
             isPlaying={isPlaying}
+            stepCount={stepCount ?? track.steps.length}
           />
         )}
       </div>
