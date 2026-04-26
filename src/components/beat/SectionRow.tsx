@@ -73,7 +73,7 @@ export function SectionRow({
         onClick={onSelect}
         className="flex items-center gap-2 w-24 shrink-0 text-left"
       >
-        <span aria-hidden="true" className="text-sm">{SECTION_EMOJI[section.type]}</span>
+        <span aria-hidden="true" className="text-sm">{section.emoji ?? SECTION_EMOJI[section.type]}</span>
         <div className="flex flex-col min-w-0">
           <span className="text-xs font-semibold text-ink truncate">{section.name}</span>
           <span className="text-[9px] text-ink-ghost">{section.tracks.length} trk · {activeSteps} steps</span>

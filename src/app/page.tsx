@@ -228,6 +228,9 @@ export default function Home() {
     });
     setAnalyser(engine.getAnalyser());
     setInitialized(true);
+    // Pre-fetch soundfont samples for ALL known voices up front so they are
+    // ready before the sequencer starts. Fire-and-forget — no await needed.
+    engine.preloadVoices(["piano", "violin", "flute", "guitar", "brass", "organ", "bell"]).catch(() => {});
   }
 
   const onStep = useCallback((step: number, time: number) => {
@@ -855,7 +858,9 @@ export default function Home() {
     await initEngine();
     const engine = getEngine();
     await engine.resume();
-    engine.playTone(noteFrequency(midi), 0.8, 1.5);
+    // Use the voice of the first melody track in the active section (if any)
+    const activeVoice = getActiveSection()?.tracks.find((t) => t.type === "melody")?.voice ?? "piano";
+    engine.playVoiceAt(activeVoice, noteFrequency(midi), 0.8, 1.5, engine.getAudioContext()?.currentTime ?? 0);
     setSelectedNote(midi);
     setSelectedChord(null);
     if (midiAccessRef.current && midiOutputIdRef.current) {
@@ -867,8 +872,9 @@ export default function Home() {
     await initEngine();
     const engine = getEngine();
     await engine.resume();
+    const activeVoice = getActiveSection()?.tracks.find((t) => t.type === "melody")?.voice ?? "piano";
     for (const midi of midiNotes) {
-      engine.playTone(noteFrequency(midi), 0.6, 2.0);
+      engine.playVoiceAt(activeVoice, noteFrequency(midi), 0.6, 2.0, engine.getAudioContext()?.currentTime ?? 0);
     }
     setSelectedChord(midiNotes);
     setSelectedNote(null);
@@ -910,6 +916,7 @@ export default function Home() {
       type: preset.type,
       name: preset.name,
       color: preset.color,
+      emoji: preset.emoji,
       vol: 1,
       mute: false,
       solo: false,
@@ -930,6 +937,12 @@ export default function Home() {
     };
     setPattern((prev) => ({ ...prev, sections: [...prev.sections, newSection] }));
     setActiveTab(id);
+    // Eagerly start loading the soundfont for the section you just switched to
+    if (initialized) {
+      const section = pattern.sections.find((s) => s.id === id);
+      const voices = section?.tracks.filter((t) => t.type === "melody").map((t) => t.voice ?? "piano") ?? [];
+      if (voices.length > 0) getEngine().preloadVoices(voices);
+    }
   }
 
   function handleRemoveSection(sectionId: string) {
@@ -1199,7 +1212,6 @@ export default function Home() {
                 onPasteRange={(ti, at) => handlePasteRange(activeSection.id, ti, at)}
                 onFillFromRange={(ti, start, end) => handleFillFromRange(activeSection.id, ti, start, end)}
                 onDurationChange={(ti, step, dur) => handleDurationChange(activeSection.id, ti, step, dur)}
-                onVoiceChange={(ti, v) => handleVoiceChange(activeSection.id, ti, v)}
                 onAddTrack={() => handleAddTrack(activeSection.id)}
                 onFocusTrack={setFocusedTrack}
                 sectionType={activeSection.type}

@@ -51,8 +51,6 @@ interface InstrumentEditorProps {
   onFocusTrack: (trackIndex: number) => void;
   /** Melody tracks: right-click a step cycles note duration (1→2→3→4 steps) */
   onDurationChange: (trackIndex: number, step: number, duration: number) => void;
-  /** Melody tracks: change the synthesized instrument voice */
-  onVoiceChange: (trackIndex: number, voice: string) => void;
   /** Forwarded to SampleSelect so the picker only shows relevant samples */
   sectionType?: SectionType;
 }
@@ -100,7 +98,6 @@ export function InstrumentEditor({
   onAddTrack,
   onFocusTrack,
   onDurationChange,
-  onVoiceChange,
   sectionType,
 }: InstrumentEditorProps) {
   const tracks = section.tracks;
@@ -185,7 +182,6 @@ export function InstrumentEditor({
             onPasteRange={(at) => onPasteRange(i, at)}
             onFillFromRange={(start, end) => onFillFromRange(i, start, end)}
             onDurationChange={(step, duration) => onDurationChange(i, step, duration)}
-            onVoiceChange={(voice) => onVoiceChange(i, voice)}
           />
         </div>
       ))}

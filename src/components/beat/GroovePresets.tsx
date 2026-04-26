@@ -4,7 +4,7 @@ import { type Pattern, type InstrumentSection, SECTION_COLORS } from "@/lib/patt
 import { Tooltip } from "@/components/ui/Tooltip";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
-type StepStr = string; // "X" = on, "." = off — any length (16, 32, 64)
+type StepStr = string; // "X" = on, "." = off
 function s(str: StepStr): boolean[] {
   return str.split("").map((c) => c !== ".");
 }
@@ -12,14 +12,22 @@ function s(str: StepStr): boolean[] {
 // Convert note name ("C4", "F#3", "Ab2" …) to MIDI number (C4 = 60)
 const MIDI_NOTE: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
 function noteToMidi(name: string): number {
-  const m = name.match(/^([A-G])(#|b)?(\d)$/);
+  const m = name.match(/^([A-G])(#|b)?(-?\d)$/);
   if (!m) return 60;
   return (parseInt(m[3]) + 1) * 12 + MIDI_NOTE[m[1]] + (m[2] === "#" ? 1 : m[2] === "b" ? -1 : 0);
 }
 
-// Track definition union — drum uses sample + step string; melody uses note sequence
+// Drum track def
 interface DrumTrackDef  { sampleId: string; steps: StepStr; vol?: number; }
-interface MelodyTrackDef { type: "melody"; noteSeq: (string | null)[]; vol?: number; }
+// Melody track: noteSeq entries are "C4" | null, durations in steps (1=1/16th, 2=1/8th, 4=1/4 etc)
+interface MelodyTrackDef {
+  type: "melody";
+  noteSeq: (string | null)[];
+  durations?: (number | null)[];
+  voice?: string;
+  vol?: number;
+  name?: string;
+}
 type TrackDef = DrumTrackDef | MelodyTrackDef;
 
 function makePattern(
@@ -27,9 +35,8 @@ function makePattern(
   tracks: TrackDef[],
   stepCount: 8 | 16 | 32 | 64 = 16,
 ): Pick<Pattern, "bpm" | "stepCount" | "sections"> {
-  // Separate defs into drum vs melody
-  const drumDefs    = tracks.filter((t): t is DrumTrackDef  => !("type" in t));
-  const melodyDefs  = tracks.filter((t): t is MelodyTrackDef => "type" in t && t.type === "melody");
+  const drumDefs   = tracks.filter((t): t is DrumTrackDef   => !("type" in t));
+  const melodyDefs = tracks.filter((t): t is MelodyTrackDef => "type" in t && t.type === "melody");
 
   const drumTracks = drumDefs.map((d, i) => ({
     id: `preset-d${i}`, sampleId: d.sampleId, type: "drum" as const,
@@ -40,16 +47,28 @@ function makePattern(
     probability: Array(stepCount).fill(1) as number[],
   }));
 
-  const pianoTracks = melodyDefs.map((m, i) => ({
-    id: `preset-m${i}`, sampleId: "synth", type: "melody" as const,
-    vol: m.vol ?? 0.75, mute: false, solo: false,
-    steps: m.noteSeq.map((n) => n !== null),
-    notes: m.noteSeq.map((n) => (n !== null ? noteToMidi(n) : null)),
-    velocity: Array(stepCount).fill(1) as number[],
-    probability: Array(stepCount).fill(1) as number[],
-  }));
+  const pianoTracks = melodyDefs.map((m, i) => {
+    const notes = m.noteSeq.map((n) => (n !== null ? noteToMidi(n) : null));
+    const steps = m.noteSeq.map((n) => n !== null);
+    const durs  = m.durations
+      ? m.durations.map((d) => d ?? 1)
+      : Array(m.noteSeq.length).fill(1) as number[];
+    return {
+      id: `preset-m${i}`,
+      name: m.name,
+      sampleId: "synth",
+      type: "melody" as const,
+      voice: m.voice ?? "piano",
+      vol: m.vol ?? 0.75,
+      mute: false, solo: false,
+      steps, notes,
+      velocity: Array(m.noteSeq.length).fill(1) as number[],
+      probability: Array(m.noteSeq.length).fill(1) as number[],
+      durations: durs,
+    };
+  });
 
-  // Ensure at least one drum track so Drums section is never empty
+  // Ensure at least one track of each type
   if (drumTracks.length === 0) {
     drumTracks.push({
       id: "preset-d-kick", sampleId: "kick", type: "drum" as const,
@@ -63,11 +82,13 @@ function makePattern(
   if (pianoTracks.length === 0) {
     pianoTracks.push({
       id: "preset-m-synth", sampleId: "synth", type: "melody" as const,
-      vol: 0.75, mute: false, solo: false,
+      name: undefined,
+      voice: "piano", vol: 0.75, mute: false, solo: false,
       steps: Array(stepCount).fill(false) as boolean[],
       notes: Array(stepCount).fill(null) as (number | null)[],
       velocity: Array(stepCount).fill(1) as number[],
       probability: Array(stepCount).fill(1) as number[],
+      durations: Array(stepCount).fill(1) as number[],
     });
   }
 
@@ -78,19 +99,9 @@ function makePattern(
       tracks: drumTracks,
     },
     {
-      id: "section-piano", type: "piano", name: "Piano",
+      id: "section-melody", type: "piano", name: "Melody",
       color: SECTION_COLORS.piano, vol: 1, mute: false, solo: false,
       tracks: pianoTracks,
-    },
-    {
-      id: "section-bass",  type: "bass",  name: "Bass",
-      color: SECTION_COLORS.bass,  vol: 1, mute: false, solo: false,
-      tracks: [{ id: "preset-b0", sampleId: "bass", type: "melody" as const, vol: 0.8, mute: false, solo: false, steps: Array(stepCount).fill(false) as boolean[], notes: Array(stepCount).fill(null) as (number | null)[], velocity: Array(stepCount).fill(1) as number[], probability: Array(stepCount).fill(1) as number[] }],
-    },
-    {
-      id: "section-synth", type: "synth", name: "Synth",
-      color: SECTION_COLORS.synth, vol: 1, mute: false, solo: false,
-      tracks: [{ id: "preset-s0", sampleId: "synth", type: "melody" as const, vol: 0.75, mute: false, solo: false, steps: Array(stepCount).fill(false) as boolean[], notes: Array(stepCount).fill(null) as (number | null)[], velocity: Array(stepCount).fill(1) as number[], probability: Array(stepCount).fill(1) as number[] }],
     },
   ];
 
@@ -98,8 +109,8 @@ function makePattern(
 }
 
 // ── Song showcase definitions ─────────────────────────────────────────────────
-// Note: drum/rhythm patterns are not copyrightable; melodies here are either
-// public domain or fair-use reconstructions for educational/interactive use.
+// All melodies are either public domain (pre-1928) or original educational
+// patterns written in a genre style. Not direct copies of copyrighted works.
 interface SongDef {
   label: string;
   artist: string;
@@ -111,166 +122,246 @@ interface SongDef {
 }
 
 const SONG_GROOVES: SongDef[] = [
+  // ── PUBLIC DOMAIN ────────────────────────────────────────────────────────
   {
-    // Traditional / public domain — "Jingle Bells" chorus, key of C.
-    // Jin-gle bells, jin-gle bells, jin-gle all the way
-    // E-E-E | E-E-E | E-G-C-D-E | F-F-F-F-F-E-E-E-E-D-D-E-D-G
-    label: "Jingle Bells",
-    artist: "Traditional",
-    emoji: "🔔",
-    description: "The classic Christmas chorus — jin-gle bells, jin-gle bells!",
-    bpm: 120,
+    // Beethoven 9th, 4th movement (1824) — public domain.
+    // E-E-F-G | G-F-E-D | C-C-D-E | E(dotted)-D-D
+    label: "Ode to Joy",
+    artist: "Beethoven",
+    emoji: "🎶",
+    description: "Beethoven's famous chorus — quarter notes, strings voice",
+    bpm: 104,
     stepCount: 32,
     tracks: [
-      // Each note = 2 steps; bar 1: E E E(rest) E E E(rest)  E G C D E(rest)
       {
-        type: "melody",
-        vol: 0.82,
-        noteSeq: [
-          "E4",null,"E4",null,"E4",null,null,null,"E4",null,"E4",null,"E4",null,null,null,
-          "E4",null,"G4",null,"C4",null,"D4",null,"E4",null,null,null,null,null,null,null,
-        ],
+        type: "melody", voice: "violin", vol: 0.82, name: "Strings",
+        noteSeq:  ["E4","E4","F4","G4","G4","F4","E4","D4","C4","C4","D4","E4","E4","D4","D4",null,
+                   "E4","E4","F4","G4","G4","F4","E4","D4","C4","C4","D4","E4","D4","C4","C4",null],
+        durations:[  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  3,  1,  4, null,
+                     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  4, null],
       },
-      { sampleId: "kick",  steps: "X.......X.......X.......X.......", vol: 0.75 },
-      { sampleId: "snare", steps: "....X.......X.......X.......X...", vol: 0.70 },
-      { sampleId: "hat",   steps: "X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.", vol: 0.35 },
+      { sampleId: "kick",  steps: "X.......X.......X.......X.......", vol: 0.62 },
+      { sampleId: "snare", steps: "....X.......X.......X.......X...", vol: 0.58 },
+      { sampleId: "hat",   steps: "X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.", vol: 0.26 },
     ],
   },
   {
-    // Traditional / public domain — "London Bridge is Falling Down", key of C.
-    // Lon-don Bridge is fall-ing down, fall-ing down, fall-ing down
-    // G-A-G-F-E-F-G | D-E-F-E-F-G | G-A-G-F-E-F-G | E-G-E-C
-    label: "London Bridge",
-    artist: "Traditional",
-    emoji: "🌉",
-    description: "London Bridge is falling down — a bouncy 3-note nursery tune",
-    bpm: 108,
+    // Beethoven "Für Elise" opening theme (1810) — public domain.
+    label: "Für Elise",
+    artist: "Beethoven",
+    emoji: "🌹",
+    description: "Beethoven's iconic piano piece — the opening theme",
+    bpm: 138,
     stepCount: 32,
     tracks: [
-      // Each note = 2 steps: G A G F E F G (rest) D E F E F G (rest)
       {
-        type: "melody",
-        vol: 0.82,
-        noteSeq: [
-          "G4",null,"A4",null,"G4",null,"F4",null,"E4",null,"F4",null,"G4",null,null,null,
-          "D4",null,"E4",null,"F4",null,"E4",null,"F4",null,"G4",null,null,null,null,null,
-        ],
+        type: "melody", voice: "piano", vol: 0.80, name: "Piano",
+        noteSeq:  ["E5","Eb5","E5","Eb5","E5","B4","D5","C5","A4",null,"C4","E4","A4",null,"B4",null,
+                   "E4","Ab4","B4","C5", null,null,null,null,"E5","Eb5","E5","Eb5","E5","B4","D5","C5"],
+        durations:[  1,   1,  1,   1,  1,  1,  1,  1,  4, null,  1,  1,  4, null,  4, null,
+                     1,   1,  1,  8, null,null,null,null,  1,   1,  1,   1,  1,  1,  1,  1],
       },
-      { sampleId: "kick",  steps: "X.......X.......X.......X.......", vol: 0.72 },
-      { sampleId: "snare", steps: "....X.......X.......X.......X...", vol: 0.65 },
-      { sampleId: "hat",   steps: "X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.", vol: 0.32 },
+      { sampleId: "kick",  steps: "X.......X.......X.......X.......", vol: 0.52 },
+      { sampleId: "snare", steps: "....X.......X.......X.......X...", vol: 0.48 },
+      { sampleId: "hat",   steps: "X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.", vol: 0.20 },
     ],
   },
   {
-    // Traditional / public domain — all 4 phrases, 8 steps each = 32 steps.
-    // Key of G. "BIRTH" gets 2 steps for the dotted-quarter feel.
-    // Phrase 1: G G A G C B  ("Hap-py Birth-day to you")
-    // Phrase 2: G G A G D C  ("Hap-py Birth-day to you")
-    // Phrase 3: G G G E C B A  ("Hap-py Birth-day dear [name]")
-    // Phrase 4: F F E C D C  ("Hap-py Birth-day to you!")
+    // "Twinkle Twinkle" — French tune (1761), public domain.
+    label: "Twinkle Twinkle",
+    artist: "Traditional",
+    emoji: "⭐",
+    description: "Classic nursery melody — bells voice, quarter notes",
+    bpm: 96,
+    stepCount: 32,
+    tracks: [
+      {
+        type: "melody", voice: "bell", vol: 0.80, name: "Bells",
+        noteSeq:  ["C4","C4","G4","G4","A4","A4","G4",null,"F4","F4","E4","E4","D4","D4","C4",null,
+                   "G4","G4","F4","F4","E4","E4","D4",null,"G4","G4","F4","F4","E4","E4","D4",null],
+        durations:[  2,  2,  2,  2,  2,  2,  4, null,  2,  2,  2,  2,  2,  2,  4, null,
+                     2,  2,  2,  2,  2,  2,  4, null,  2,  2,  2,  2,  2,  2,  4, null],
+      },
+      { sampleId: "kick",  steps: "X.......X.......X.......X.......", vol: 0.62 },
+      { sampleId: "snare", steps: "....X.......X.......X.......X...", vol: 0.58 },
+      { sampleId: "hat",   steps: "X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.", vol: 0.28 },
+    ],
+  },
+  {
+    // "Happy Birthday" — Hill sisters (1893), public domain.
     label: "Happy Birthday",
     artist: "Traditional",
     emoji: "🎂",
-    description: "The most famous song in the world — all 4 phrases, simple G major melody",
+    description: "All 4 phrases — bells voice, dotted-quarter feel",
     bpm: 92,
     stepCount: 32,
     tracks: [
       {
-        type: "melody",
-        vol: 0.82,
-        noteSeq: [
-          "G4","G4","A4",null,"G4","C5","B4",null,
-          "G4","G4","A4",null,"G4","D5","C5",null,
-          "G4","G4","G4","E4","C5","B4","A4",null,
-          "F4","F4","E4",null,"C5","D5","C5",null,
-        ],
+        type: "melody", voice: "bell", vol: 0.82, name: "Bells",
+        noteSeq:  ["G4","G4","A4",null,"G4","C5","B4",null,
+                   "G4","G4","A4",null,"G4","D5","C5",null,
+                   "G4","G4","G5","E4","C5","B4","A4",null,
+                   "F4","F4","E4",null,"C5","D5","C5",null],
+        durations:[  1,  1,  2, null,  2,  2,  4, null,
+                     1,  1,  2, null,  2,  2,  4, null,
+                     1,  1,  2,  2,   2,  2,  4, null,
+                     1,  1,  2, null,  2,  2,  4, null],
       },
-      { sampleId: "kick",  steps: "X.......X.......X.......X.......", vol: 0.7 },
-      { sampleId: "snare", steps: "....X.......X.......X.......X...", vol: 0.65 },
-      { sampleId: "hat",   steps: "X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.", vol: 0.3 },
+      { sampleId: "kick",  steps: "X.......X.......X.......X.......", vol: 0.65 },
+      { sampleId: "snare", steps: "....X.......X.......X.......X...", vol: 0.60 },
+      { sampleId: "hat",   steps: "X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.", vol: 0.26 },
     ],
   },
   {
-    // Traditional / public domain — only 3 notes! Perfect for beginners.
-    // E-D-C-D-E-E-E | D-D-D | E-G-G | E-D-C-D-E-E-E-E-D-D-E-D-C
-    label: "Mary Had a Little Lamb",
+    // "Mary Had a Little Lamb" — public domain.
+    label: "Mary Had a Lamb",
     artist: "Traditional",
     emoji: "🐑",
-    description: "Only 3 notes: E, D and C — the easiest melody to learn",
+    description: "Only 3 notes — E, D, C. Perfect for beginners. Flute voice.",
     bpm: 100,
     stepCount: 32,
     tracks: [
-      // E-D-C-D-E-E-E(rest) D-D-D(rest) E-G-G(rest) — each note = 2 steps
       {
-        type: "melody",
-        vol: 0.82,
-        noteSeq: [
-          "E4",null,"D4",null,"C4",null,"D4",null,"E4",null,"E4",null,"E4",null,null,null,
-          "D4",null,"D4",null,"D4",null,null,null,"E4",null,"G4",null,"G4",null,null,null,
-        ],
+        type: "melody", voice: "flute", vol: 0.80, name: "Flute",
+        noteSeq:  ["E4","D4","C4","D4","E4","E4","E4",null,"D4","D4","D4",null,"E4","G4","G4",null,
+                   "E4","D4","C4","D4","E4","E4","E4","E4","D4","D4","E4","D4","C4",null,null,null],
+        durations:[  2,  2,  2,  2,  2,  2,  4, null,  2,  2,  4, null,  2,  2,  4, null,
+                     2,  2,  2,  2,  2,  2,  2,  2,   2,  2,  2,  2,   4, null,null,null],
       },
-      { sampleId: "kick",  steps: "X.......X.......X.......X.......", vol: 0.7 },
-      { sampleId: "snare", steps: "....X.......X.......X.......X...", vol: 0.65 },
-      { sampleId: "hat",   steps: "X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.", vol: 0.3 },
+      { sampleId: "kick",  steps: "X.......X.......X.......X.......", vol: 0.62 },
+      { sampleId: "snare", steps: "....X.......X.......X.......X...", vol: 0.58 },
+      { sampleId: "hat",   steps: "X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.", vol: 0.26 },
+    ],
+  },
+  // ── GENRE PATTERNS ───────────────────────────────────────────────────────
+  // Original educational patterns in a genre style — not copies of any song.
+  {
+    // Blues rock — pentatonic minor riff, guitar voice
+    label: "Blues Rock",
+    artist: "Genre",
+    emoji: "🎸",
+    description: "Pentatonic minor guitar riff — classic blues/rock feel",
+    bpm: 100,
+    stepCount: 32,
+    tracks: [
+      {
+        type: "melody", voice: "guitar", vol: 0.82, name: "Guitar",
+        noteSeq:  ["A2","A2","C3","D3","Eb3","D3","C3","A2","A2","A2","C3","D3","E3","G3","E3","A3",
+                   "D3","D3","F3","G3","Ab3","G3","F3","D3","A2","A2","C3","D3","E3",null,null,null],
+        durations:[  1,  1,  1,  1,   1,  1,  1,  2,  1,  1,  1,  1,  1,  1,  4, null,
+                     1,  1,  1,  1,   1,  1,  1,  2,  1,  1,  1,  1,  4, null,null,null],
+      },
+      { sampleId: "kick",      steps: "X...X.X.....X...X...X.X.....X...", vol: 0.82 },
+      { sampleId: "snare",     steps: "....X.......X.......X.......X...", vol: 0.78 },
+      { sampleId: "hat",       steps: "X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.", vol: 0.40 },
+      { sampleId: "floor-tom", steps: "..............X...............X.", vol: 0.62 },
     ],
   },
   {
-    // Traditional / public domain — perfect Chrome Music Lab style intro melody.
-    label: "Twinkle Twinkle",
-    artist: "Traditional",
-    emoji: "⭐",
-    description: "Classic nursery rhyme melody — great starting point for kids",
-    bpm: 96,
+    // Funk — organ/keys, syncopated kick, conga
+    label: "Funk Groove",
+    artist: "Genre",
+    emoji: "🎺",
+    description: "Tight funk — organ chords, syncopated kick, conga groove",
+    bpm: 98,
     stepCount: 32,
     tracks: [
-      // C-C-G-G-A-A-G | F-F-E-E-D-D-C  (each note = 2 16th steps)
       {
-        type: "melody",
-        vol: 0.8,
-        noteSeq: [
-          "C4",null,"C4",null,"G4",null,"G4",null,"A4",null,"A4",null,"G4",null,null,null,
-          "F4",null,"F4",null,"E4",null,"E4",null,"D4",null,"D4",null,"C4",null,null,null,
-        ],
+        type: "melody", voice: "organ", vol: 0.78, name: "Keys",
+        noteSeq:  ["Eb3",null,"Eb3",null,"Gb3",null,"Eb3","Ab3","Eb3",null,"Eb3",null,"Gb3","Bb3","Ab3",null,
+                   "Eb3",null,"Eb3",null,"Gb3",null,"Eb3","Ab3","Eb3",null,"Ab3",null,"Gb3",null,null,null],
+        durations:[  1, null,  1, null,  1, null,  1,  1,  1, null,  1, null,  1,  1,  2, null,
+                     1, null,  1, null,  1, null,  1,  1,  1, null,  2, null,  4, null,null,null],
       },
-      // Light kick on beats 1 and 3
-      { sampleId: "kick",  steps: "X.......X.......X.......X.......", vol: 0.7 },
-      // Snare on 2 and 4
-      { sampleId: "snare", steps: "....X.......X.......X.......X...", vol: 0.7 },
-      // Soft 8th-note hat
-      { sampleId: "hat",   steps: "X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.", vol: 0.35 },
+      { sampleId: "kick",  steps: "X......X...X..X.X......X...X..X.", vol: 0.84 },
+      { sampleId: "snare", steps: "....X.......X.......X.......X...", vol: 0.80 },
+      { sampleId: "hat",   steps: "X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.", vol: 0.38 },
+      { sampleId: "conga", steps: "..X.....X.X.....X...X.X.....X...", vol: 0.56 },
+      { sampleId: "snap",  steps: "........X...............X.......", vol: 0.62 },
     ],
   },
   {
-    // Beethoven 9th, 4th movement (1824) — public domain.
-    label: "Ode to Joy",
-    artist: "Beethoven",
-    emoji: "🎶",
-    description: "Beethoven's famous melody — E4 phrase in C major, public domain",
-    bpm: 108,
-    stepCount: 32,
+    // Hip-hop — piano chords over boom-bap drums
+    label: "Boom Bap",
+    artist: "Genre",
+    emoji: "🎤",
+    description: "90s boom-bap — heavy snare, piano chord stabs",
+    bpm: 87,
+    stepCount: 16,
     tracks: [
-      // E-E-F-G-G-F-E-D | C-C-D-E-E-D-D  (each note = 2 16th steps)
       {
-        type: "melody",
-        vol: 0.8,
-        noteSeq: [
-          "E4",null,"E4",null,"F4",null,"G4",null,"G4",null,"F4",null,"E4",null,"D4",null,
-          "C4",null,"C4",null,"D4",null,"E4",null,"E4",null,"D4",null,"D4",null,null,null,
-        ],
+        type: "melody", voice: "piano", vol: 0.72, name: "Piano",
+        noteSeq:  ["D3",null,null,"C3","A2",null,null,null,"F3",null,null,"E3","C3",null,null,null],
+        durations:[  2, null,null,  2,  4, null,null,null,  2, null,null,  2,  4, null,null,null],
       },
-      // Kick on downbeats
-      { sampleId: "kick",  steps: "X.......X.......X.......X.......", vol: 0.65 },
-      // Light snare on 2 and 4
-      { sampleId: "snare", steps: "....X.......X.......X.......X...", vol: 0.6 },
-      // Soft hat
-      { sampleId: "hat",   steps: "X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.", vol: 0.3 },
-      // Chord hit on beat 1 of each bar
-      { sampleId: "chord", steps: "X...............X...............", vol: 0.45 },
+      { sampleId: "kick",  steps: "X...X.......X...", vol: 0.86 },
+      { sampleId: "snare", steps: "....X.......X...", vol: 0.82 },
+      { sampleId: "hat",   steps: "..X...X...X...X.", vol: 0.42 },
+      { sampleId: "snap",  steps: "........X.......", vol: 0.65 },
+    ],
+  },
+  {
+    // Jazz swing — ii-V-I chord walk, piano + rim
+    label: "Jazz Swing",
+    artist: "Genre",
+    emoji: "🎷",
+    description: "Swing 8ths — ii-V-I in C major, piano voicing, ride cymbal",
+    bpm: 120,
+    stepCount: 16,
+    tracks: [
+      {
+        type: "melody", voice: "piano", vol: 0.70, name: "Piano",
+        noteSeq:  ["D3","F3","A3","C4","G2","B3","D4","F4","C3","E3","G3","B3","C4",null,null,null],
+        durations:[  1,  1,  1,  2,  1,  1,  1,  2,  1,  1,  1,  2,  4, null,null,null],
+      },
+      { sampleId: "kick",    steps: "X.......X.......", vol: 0.55 },
+      { sampleId: "rimshot", steps: "....X.......X...", vol: 0.62 },
+      { sampleId: "hat",     steps: "X.X.X.X.X.X.X.X.", vol: 0.36 },
+    ],
+  },
+  {
+    // Reggae one-drop with organ skank
+    label: "Reggae",
+    artist: "Genre",
+    emoji: "🌴",
+    description: "One-drop kick on beat 3 — organ chord skank, offbeat feel",
+    bpm: 82,
+    stepCount: 16,
+    tracks: [
+      {
+        type: "melody", voice: "organ", vol: 0.68, name: "Organ",
+        noteSeq:  [null,"G3",null,null,null,"G3",null,null,null,"C4",null,null,null,"C4",null,null],
+        durations:[null,  1, null,null,null,  1, null,null,null,  1, null,null,null,  1, null,null],
+      },
+      { sampleId: "kick",     steps: "........X.......", vol: 0.80 },
+      { sampleId: "rimshot",  steps: "....X.......X...", vol: 0.70 },
+      { sampleId: "open-hat", steps: "..X...X...X...X.", vol: 0.60 },
+      { sampleId: "hat",      steps: "X.X.X.X.X.X.X.X.", vol: 0.26 },
+    ],
+  },
+  {
+    // Bossa Nova — guitar chords on clave
+    label: "Bossa Nova",
+    artist: "Genre",
+    emoji: "🎸",
+    description: "Brazilian bossa — guitar chords on 3-2 clave, light percussion",
+    bpm: 105,
+    stepCount: 16,
+    tracks: [
+      {
+        type: "melody", voice: "guitar", vol: 0.70, name: "Guitar",
+        noteSeq:  ["A3",null,"C#4","E4",null,"A3",null,null,"A3",null,"E4",null,"C#4",null,null,null],
+        durations:[  2, null,  1,   2, null,  2, null,null,  2, null,  2, null,  2,  null,null,null],
+      },
+      { sampleId: "kick",      steps: "X.......X.......", vol: 0.62 },
+      { sampleId: "rimshot",   steps: "..X.X.......X.X.", vol: 0.65 },
+      { sampleId: "shaker",    steps: "X.X.X.X.X.X.X.X.", vol: 0.50 },
+      { sampleId: "woodblock", steps: "X..X..X...X.X...", vol: 0.60 },
     ],
   },
 ];
 
-// ── Groove definitions ───────────────────────────────────────────────────────
+// ── Genre starter grooves ─────────────────────────────────────────────────────
 interface GrooveDef {
   label: string;
   emoji: string;

@@ -37,6 +37,8 @@ export interface InstrumentSection {
   name: string;
   /** Hex accent color for the section tab */
   color: string;
+  /** Emoji icon — stored so it persists for custom preset types */
+  emoji?: string;
   /** Section-level volume applied on top of individual track volumes */
   vol: number;
   mute: boolean;
