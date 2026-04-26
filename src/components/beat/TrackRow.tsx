@@ -1,13 +1,13 @@
 "use client";
 import React, { useState, useRef } from "react";
-import { type TrackState, type SectionType } from "@/lib/pattern";
+import { type TrackState, type SectionType, MELODY_VOICES } from "@/lib/pattern";
 import { NOTE_NAMES } from "@/lib/scales";
 import { SampleSelect } from "./SampleSelect";
 import { StepGrid } from "./StepGrid";
 import { NotationStrip } from "./NotationStrip";
 import { Toggle } from "@/components/ui/Toggle";
 import { Tooltip } from "@/components/ui/Tooltip";
-import { TRACK_COLORS } from "@/lib/utils";
+import { TRACK_COLORS, cn } from "@/lib/utils";
 
 /** Format MIDI note as e.g. "C4", "F#3" */
 function midiLabel(midi: number): string {
@@ -59,7 +59,9 @@ interface TrackRowProps {
   onCopyRange?: (start: number, end: number) => void;
   onPasteRange?: (at: number) => void;
   onFillFromRange?: (start: number, end: number) => void;
-}
+  /** Melody tracks: right-click cycles note duration (1→2→3→4 steps) */
+  onDurationChange?: (step: number, duration: number) => void;  /** Melody tracks: change the synthesized instrument voice */
+  onVoiceChange?: (voice: string) => void;}
 
 export function TrackRow({
   track,
@@ -100,6 +102,8 @@ export function TrackRow({
   onCopyRange,
   onPasteRange,
   onFillFromRange,
+  onDurationChange,
+  onVoiceChange,
 }: TrackRowProps) {
   const isMelody = track.type === "melody";
   const [editingName, setEditingName] = useState(false);
@@ -241,6 +245,29 @@ export function TrackRow({
                 >+</button>
               </div>
             )}
+            {/* Instrument voice picker */}
+            {onVoiceChange && (
+              <div className="flex items-center gap-0.5 flex-wrap">
+                {MELODY_VOICES.map((v) => (
+                  <Tooltip key={v.id} content={`${v.label} — ${v.description}`}>
+                    <button
+                      type="button"
+                      onClick={() => onVoiceChange(v.id)}
+                      aria-label={v.label}
+                      aria-pressed={(track.voice ?? "piano") === v.id}
+                      className={cn(
+                        "h-5 min-w-5 px-0.5 rounded text-[12px] leading-none transition-colors shrink-0",
+                        (track.voice ?? "piano") === v.id
+                          ? "opacity-100 ring-1 ring-indigo-400 bg-indigo-500/20"
+                          : "opacity-40 hover:opacity-90 hover:bg-well",
+                      )}
+                    >
+                      {v.emoji}
+                    </button>
+                  </Tooltip>
+                ))}
+              </div>
+            )}
           </div>
         ) : (
           <>
@@ -280,9 +307,12 @@ export function TrackRow({
           trackColor={isMelody ? "#6366f1" : trackColor}
           onPaintStart={onPaintStart}
           onPaint={onPaint}
-          onVelocityChange={onVelocityChange}
+          onVelocityChange={isMelody ? undefined : onVelocityChange}
+          onDurationChange={isMelody ? onDurationChange : undefined}
+          durations={isMelody ? track.durations : undefined}
           noteLabels={noteLabels}
           velocities={track.velocity}
+          stepCount={stepCount}
           selection={selection}
           selectionMode={selectionMode}
           onRangeSelect={(start, end) => setSelection([start, end])}

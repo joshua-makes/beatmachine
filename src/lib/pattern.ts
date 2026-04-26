@@ -17,10 +17,14 @@ export interface TrackState {
   velocity: number[];
   /** Per-step fire probability 0–1 (default 1.0). 1 = always fires, 0.5 = 50% chance. */
   probability: number[];
+  /** Per-step note duration in steps (default 1). Melody tracks only — sets how many steps the note rings. */
+  durations?: number[];
   /** Octave transpose for melody tracks: -3 to +3. Default 0. */
   octaveOffset?: number;
   /** Custom track color hex string. Falls back to palette color when absent. */
   color?: string;
+  /** Synthesized instrument voice for melody tracks. Default: "piano" */
+  voice?: string;
 }
 
 /** The instrument category for a section */
@@ -73,6 +77,52 @@ export const SECTION_EMOJI: Record<SectionType, string> = {
   custom: "🎵",
 };
 
+/** Synthesized instrument voices available for melody tracks */
+export const MELODY_VOICES = [
+  { id: "piano",  label: "Piano",  emoji: "🎹", description: "Classic electric piano tone" },
+  { id: "violin", label: "Violin", emoji: "🎻", description: "Bowed string with vibrato" },
+  { id: "flute",  label: "Flute",  emoji: "🪈", description: "Pure breathy wind tone" },
+  { id: "guitar", label: "Guitar", emoji: "🎸", description: "Plucked acoustic string" },
+  { id: "brass",  label: "Brass",  emoji: "🎺", description: "Bright horn / trumpet tone" },
+  { id: "organ",  label: "Organ",  emoji: "🎼", description: "Hammond-style drawbar organ" },
+  { id: "bell",   label: "Bell",   emoji: "🔔", description: "Metallic bell / marimba" },
+] as const;
+
+export type MelodyVoice = typeof MELODY_VOICES[number]["id"];
+
+/**
+ * Instrument presets shown in the "Add section" picker.
+ * Each maps to an existing SectionType for behavioral purposes
+ * (drums = sample-based, anything else = melody + piano keyboard).
+ * `defaultVoice` is the synthesized timbre pre-selected for new tracks.
+ */
+export const SECTION_PRESETS = [
+  // ── Keyboards ──────────────────────────────────────────────────────────────
+  { id: "piano",      name: "Piano",       type: "piano"  as SectionType, color: "#6366f1", emoji: "🎹", defaultVoice: "piano",  group: "Keys",       description: "Grand piano" },
+  { id: "organ",      name: "Organ",       type: "synth"  as SectionType, color: "#8b5cf6", emoji: "🎼", defaultVoice: "organ",  group: "Keys",       description: "Hammond drawbar organ" },
+  { id: "synth",      name: "Synth",       type: "synth"  as SectionType, color: "#a855f7", emoji: "🎛️", defaultVoice: "piano",  group: "Keys",       description: "Synthesizer / lead" },
+  { id: "bell",       name: "Bells",       type: "custom" as SectionType, color: "#0ea5e9", emoji: "🔔", defaultVoice: "bell",   group: "Keys",       description: "Bells, marimba, glockenspiel" },
+  // ── Strings ────────────────────────────────────────────────────────────────
+  { id: "strings",    name: "Strings",     type: "custom" as SectionType, color: "#ec4899", emoji: "🎻", defaultVoice: "violin", group: "Strings",    description: "String section / orchestra" },
+  { id: "violin",     name: "Violin",      type: "custom" as SectionType, color: "#f43f5e", emoji: "🎻", defaultVoice: "violin", group: "Strings",    description: "Solo violin" },
+  { id: "guitar",     name: "Guitar",      type: "custom" as SectionType, color: "#d97706", emoji: "🎸", defaultVoice: "guitar", group: "Strings",    description: "Acoustic / electric guitar" },
+  // ── Bass ───────────────────────────────────────────────────────────────────
+  { id: "bass",       name: "Bass",        type: "bass"   as SectionType, color: "#22c55e", emoji: "🎸", defaultVoice: "guitar", group: "Bass",       description: "Bass guitar / synth bass" },
+  // ── Brass & Woodwinds ──────────────────────────────────────────────────────
+  { id: "brass",      name: "Brass",       type: "custom" as SectionType, color: "#f59e0b", emoji: "🎺", defaultVoice: "brass",  group: "Brass & WW", description: "Trumpet, trombone, horn" },
+  { id: "flute",      name: "Flute",       type: "custom" as SectionType, color: "#06b6d4", emoji: "🪈", defaultVoice: "flute",  group: "Brass & WW", description: "Flute, piccolo" },
+  { id: "woodwinds",  name: "Woodwinds",   type: "custom" as SectionType, color: "#22d3ee", emoji: "🎷", defaultVoice: "flute",  group: "Brass & WW", description: "Clarinet, sax, oboe" },
+  // ── Vocals ─────────────────────────────────────────────────────────────────
+  { id: "choir",      name: "Choir",       type: "custom" as SectionType, color: "#14b8a6", emoji: "🎤", defaultVoice: "flute",  group: "Vocals",     description: "Choir / vocal pad" },
+  // ── Percussion & Drums ─────────────────────────────────────────────────────
+  { id: "drums",      name: "Drums",       type: "drums"  as SectionType, color: "#f97316", emoji: "🥁", defaultVoice: "piano",  group: "Percussion", description: "Full drum kit" },
+  { id: "percussion", name: "Percussion",  type: "drums"  as SectionType, color: "#fb923c", emoji: "🪘", defaultVoice: "piano",  group: "Percussion", description: "Latin & world percussion" },
+  // ── Custom ─────────────────────────────────────────────────────────────────
+  { id: "custom",     name: "Custom",      type: "custom" as SectionType, color: "#64748b", emoji: "🎵", defaultVoice: "piano",  group: "Other",      description: "Blank section — configure yourself" },
+] as const;
+
+export type SectionPreset = typeof SECTION_PRESETS[number];
+
 /** Default accent colors per section type */
 export const SECTION_COLORS: Record<SectionType, string> = {
   drums:  "#f97316",
@@ -96,6 +146,7 @@ function emptyTrack(id: string, sampleId: string, type: TrackState["type"], step
     notes: Array(stepCount).fill(null) as (number | null)[],
     velocity: Array(stepCount).fill(1) as number[],
     probability: Array(stepCount).fill(1) as number[],
+    durations: Array(stepCount).fill(1) as number[],
   };
 }
 
@@ -272,6 +323,7 @@ export function deserializePattern(data: string): Pattern {
               notes:       Array((t.steps as boolean[])?.length ?? stepCount).fill(null),
               velocity:    Array((t.steps as boolean[])?.length ?? stepCount).fill(1),
               probability: Array((t.steps as boolean[])?.length ?? stepCount).fill(1),
+              durations:   Array((t.steps as boolean[])?.length ?? stepCount).fill(1),
               ...t,
             }))
           : [],
@@ -290,6 +342,7 @@ export function deserializePattern(data: string): Pattern {
         notes:       Array((t.steps as boolean[])?.length ?? stepCount).fill(null),
         velocity:    Array((t.steps as boolean[])?.length ?? stepCount).fill(1),
         probability: Array((t.steps as boolean[])?.length ?? stepCount).fill(1),
+        durations:   Array((t.steps as boolean[])?.length ?? stepCount).fill(1),
         ...t,
       })) as TrackState[];
 

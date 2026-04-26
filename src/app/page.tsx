@@ -10,7 +10,7 @@ import { getEngine } from "@/lib/audio/engine";
 import { Scheduler, stepDurationSec } from "@/lib/audio/scheduler";
 import {
   createDefaultPattern, decodeShareUrl,
-  type Pattern, type TrackState, type InstrumentSection,
+  type Pattern, type TrackState, type InstrumentSection, type SectionPreset,
   SECTION_COLORS,
 } from "@/lib/pattern";
 import { clamp } from "@/lib/utils";
@@ -267,14 +267,14 @@ export default function Home() {
         if (track.type === "melody") {
           const midi = track.notes?.[secStep];
           if (midi != null) {
-            const dur = stepDurationSec(p.bpm) * 1.8;
+            const dur = stepDurationSec(p.bpm) * (track.durations?.[secStep] ?? 1) * 0.95;
             const octaveShift = (track.octaveOffset ?? 0) * 12;
             const midiArr = Array.isArray(midi) ? midi : [midi];
             const timeJitter = humanize > 0 ? (Math.random() - 0.3) * humanize * 0.0006 : 0;
             const playTime = time + Math.max(0, timeJitter);
             for (const m of midiArr) {
               const shifted = m + octaveShift;
-              engine.playToneAt(noteFrequency(shifted), track.vol * section.vol * 0.85, dur, playTime);
+              engine.playVoiceAt(track.voice ?? "piano", noteFrequency(shifted), track.vol * section.vol * 0.85, dur, playTime);
               notesThisStep.push(shifted);
               if (midiAccessRef.current && midiOutputIdRef.current) {
                 sendMelodicNote(midiAccessRef.current, midiOutputIdRef.current, shifted, Math.round(track.vol * 85), Math.round(dur * 1000));
@@ -352,7 +352,7 @@ export default function Home() {
   }
 
   function handleBpmChange(bpm: number) {
-    setPattern((prev) => ({ ...prev, bpm: clamp(bpm, 60, 200) }));
+    setPattern((prev) => ({ ...prev, bpm: clamp(bpm, 40, 250) }));
   }
 
   function handleMasterVolChange(vol: number) {
@@ -411,6 +411,9 @@ export default function Home() {
           probability: count > (t.probability?.length ?? 0)
             ? [...(t.probability ?? []), ...Array(count - (t.probability?.length ?? 0)).fill(1)]
             : (t.probability ?? Array(count).fill(1)).slice(0, count),
+          durations: count > (t.durations?.length ?? 0)
+            ? [...(t.durations ?? Array(t.steps.length).fill(1)), ...Array(count - (t.durations?.length ?? t.steps.length)).fill(1)]
+            : (t.durations ?? Array(count).fill(1)).slice(0, count),
         })),
       })),
     }));
@@ -441,6 +444,18 @@ export default function Home() {
 
   function handleColorChange(sectionId: string, trackIndex: number, color: string) {
     updateTrack(sectionId, trackIndex, (t) => ({ ...t, color }));
+  }
+
+  function handleDurationChange(sectionId: string, trackIndex: number, step: number, duration: number) {
+    updateTrack(sectionId, trackIndex, (t) => {
+      const durations = [...(t.durations ?? Array(t.steps.length).fill(1))];
+      durations[step] = duration;
+      return { ...t, durations };
+    });
+  }
+
+  function handleVoiceChange(sectionId: string, trackIndex: number, voice: string) {
+    updateTrack(sectionId, trackIndex, (t) => ({ ...t, voice }));
   }
 
   async function handleSoundPackSwitch(packId: string, folder: string) {
@@ -482,6 +497,7 @@ export default function Home() {
           notes:       Array(prev.stepCount).fill(null),
           velocity:    Array(prev.stepCount).fill(1) as number[],
           probability: Array(prev.stepCount).fill(1) as number[],
+          durations:   Array(prev.stepCount).fill(1) as number[],
         })),
       })),
     }));
@@ -493,6 +509,7 @@ export default function Home() {
       ...t,
       steps: t.steps.map(() => false),
       notes: t.notes.map(() => null),
+      durations: t.durations?.map(() => 1),
     }));
   }
 
@@ -575,6 +592,7 @@ export default function Home() {
       notes: Array(pattern.stepCount).fill(null) as (number | null)[],
       velocity: Array(pattern.stepCount).fill(1) as number[],
       probability: Array(pattern.stepCount).fill(1) as number[],
+      durations: Array(pattern.stepCount).fill(1) as number[],
     };
     updateSection(sectionId, (s) => ({ ...s, tracks: [...s.tracks, newTrack] }));
   }
@@ -631,6 +649,7 @@ export default function Home() {
         notes: [...original.notes],
         velocity: [...original.velocity],
         probability: [...original.probability],
+        durations: original.durations ? [...original.durations] : undefined,
       };
       tracks.splice(trackIndex + 1, 0, clone);
       return { ...s, tracks };
@@ -652,6 +671,7 @@ export default function Home() {
         steps:    rotateArr(t.steps),
         notes:    rotateArr(t.notes),
         velocity: rotateArr(t.velocity),
+        durations: t.durations ? rotateArr(t.durations) : undefined,
       };
     });
   }
@@ -673,6 +693,7 @@ export default function Home() {
           notes:    [...t.notes,    ...t.notes],
           velocity: [...t.velocity, ...t.velocity],
           probability: [...t.probability, ...t.probability],
+          durations: t.durations ? [...t.durations, ...t.durations] : undefined,
         })),
       })),
     }));
@@ -880,21 +901,23 @@ export default function Home() {
 
   // ── Add / remove sections ─────────────────────────────────────────────────
 
-  function handleAddSection() {
+  function handleAddSection(preset: SectionPreset) {
     pushHistory();
-    const id = `section-custom-${Date.now()}`;
+    const id = `section-${preset.id}-${Date.now()}`;
+    const isDrum = preset.type === "drums";
     const newSection: InstrumentSection = {
       id,
-      type: "custom",
-      name: "Custom",
-      color: SECTION_COLORS.custom,
+      type: preset.type,
+      name: preset.name,
+      color: preset.color,
       vol: 1,
       mute: false,
       solo: false,
       tracks: [{
         id: `track-${Date.now()}`,
-        sampleId: "synth",
-        type: "melody",
+        sampleId: isDrum ? "kick" : "synth",
+        type: isDrum ? "drum" : "melody",
+        voice: isDrum ? undefined : preset.defaultVoice,
         vol: 0.8,
         mute: false,
         solo: false,
@@ -902,10 +925,19 @@ export default function Home() {
         notes: Array(pattern.stepCount).fill(null) as (number | null)[],
         velocity: Array(pattern.stepCount).fill(1) as number[],
         probability: Array(pattern.stepCount).fill(1) as number[],
+        durations: Array(pattern.stepCount).fill(1) as number[],
       }],
     };
     setPattern((prev) => ({ ...prev, sections: [...prev.sections, newSection] }));
     setActiveTab(id);
+  }
+
+  function handleRemoveSection(sectionId: string) {
+    if (pattern.sections.length <= 1) return; // always keep at least one section
+    pushHistory();
+    const remaining = pattern.sections.filter((s) => s.id !== sectionId);
+    setPattern((prev) => ({ ...prev, sections: prev.sections.filter((s) => s.id !== sectionId) }));
+    if (activeTab === sectionId) setActiveTab(remaining[0]?.id ?? "");
   }
 
   // Derive active section — fallback to first section if activeTab is invalid/"mix"
@@ -1102,6 +1134,7 @@ export default function Home() {
           activeTabId={activeTab}
           onTabChange={setActiveTab}
           onAddSection={handleAddSection}
+          onRemoveSection={pattern.sections.length > 1 ? handleRemoveSection : undefined}
         />
 
         {/* ── Tab content ── */}
@@ -1165,6 +1198,8 @@ export default function Home() {
                 onCopyRange={(ti, start, end) => handleCopyRange(activeSection.id, ti, start, end)}
                 onPasteRange={(ti, at) => handlePasteRange(activeSection.id, ti, at)}
                 onFillFromRange={(ti, start, end) => handleFillFromRange(activeSection.id, ti, start, end)}
+                onDurationChange={(ti, step, dur) => handleDurationChange(activeSection.id, ti, step, dur)}
+                onVoiceChange={(ti, v) => handleVoiceChange(activeSection.id, ti, v)}
                 onAddTrack={() => handleAddTrack(activeSection.id)}
                 onFocusTrack={setFocusedTrack}
                 sectionType={activeSection.type}

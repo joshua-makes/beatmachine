@@ -3,20 +3,34 @@ import React, { useRef, useState } from "react";
 import { Tooltip } from "@/components/ui/Tooltip";
 
 const STEP_TIPS: Record<number, string> = {
-  8:  "8 steps — half-time / sparse feel",
-  16: "16 steps — standard 1-bar pattern",
-  32: "32 steps — 2-bar extended pattern",
-  64: "64 steps — 4-bar phrase",
+  8:  "½ bar · 8 steps · 2 beats — half-time, sparse, or intro feel",
+  16: "1 bar · 16 steps · 4 beats — standard pattern (most common)",
+  32: "2 bars · 32 steps · 8 beats — extended phrase or 2-bar loop",
+  64: "4 bars · 64 steps · 16 beats — long loop or full section",
 };
 
-/** Friendly tempo label shown under the BPM slider */
+/** Bar count labels shown on the step-count buttons */
+const BAR_LABELS: Record<number, string> = {
+  8:  "½ bar",
+  16: "1 bar",
+  32: "2 bars",
+  64: "4 bars",
+};
+
+/**
+ * Italian tempo markings + genre context shown under the BPM slider.
+ * Ranges follow the standard classical definitions.
+ */
 function bpmLabel(bpm: number): string {
-  if (bpm < 70)  return "😴 Very Slow";
-  if (bpm < 90)  return "🚶 Slow";
-  if (bpm < 110) return "🙂 Medium";
-  if (bpm < 130) return "🏃 Fast";
-  if (bpm < 160) return "🚀 Very Fast";
-  return "⚡ Super Fast";
+  if (bpm <  60) return "Larghissimo — very slow / ambient";
+  if (bpm <  66) return "Largo — slow and broad";
+  if (bpm <  76) return "Adagio — slow / ballad";
+  if (bpm <  96) return "Andante — walking pace / hip-hop";
+  if (bpm < 112) return "Moderato — moderate / R&B";
+  if (bpm < 132) return "Allegro — lively / pop / house";
+  if (bpm < 160) return "Vivace — vivacious / techno / trance";
+  if (bpm < 184) return "Presto — fast / drum & bass";
+  return "Prestissimo — extreme tempo";
 }
 
 interface TransportProps {
@@ -87,14 +101,14 @@ export function Transport({
 
   const bpmSection = (
     <div className="flex items-center gap-2">
-      <Tooltip content="Beats per minute (60–200)" position="bottom">
+      <Tooltip content="Beats per minute (BPM) · 40–250" position="bottom">
         <span className="text-xs font-semibold uppercase tracking-widest text-ink-dim cursor-default">BPM</span>
       </Tooltip>
       <Tooltip content="Type a BPM value" position="bottom">
         <input
           type="number"
-          min={60}
-          max={200}
+          min={40}
+          max={250}
           value={bpm}
           onChange={(e) => { const v = parseInt(e.target.value, 10); if (!isNaN(v)) onBpmChange(v); }}
           className="w-16 rounded-lg bg-well border border-rim px-2 py-1.5 text-sm font-mono text-ink text-center focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
@@ -117,8 +131,8 @@ export function Transport({
 
   const stepsSection = (
     <div className="flex items-center gap-2">
-      <Tooltip content="Number of steps in the pattern loop" position="bottom">
-        <span className="text-xs font-semibold uppercase tracking-widest text-ink-dim cursor-default">Steps</span>
+      <Tooltip content="Pattern length in bars (1 bar = 4 beats = 16 steps at standard resolution)" position="bottom">
+        <span className="text-xs font-semibold uppercase tracking-widest text-ink-dim cursor-default">Length</span>
       </Tooltip>
       <div className="flex items-center rounded-lg bg-well border border-rim p-0.5">
         {([8, 16, 32, 64] as const)
@@ -129,11 +143,11 @@ export function Transport({
               type="button"
               onClick={() => onStepCountChange(n)}
               aria-pressed={stepCount === n}
-              className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
+              className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors leading-none ${
                 stepCount === n ? "bg-indigo-600 text-white" : "text-ink-dim hover:text-ink"
               }`}
             >
-              {n}
+              {BAR_LABELS[n]}
             </button>
           </Tooltip>
         ))}
@@ -164,7 +178,7 @@ export function Transport({
 
   const feelSection = (
     <div className="flex items-center gap-2">
-      <Tooltip content="Humanize — adds subtle timing and velocity variation" position="bottom">
+      <Tooltip content="Humanize — adds subtle timing and velocity variation, like a live player (0 = robotic · 100 = loose)" position="bottom">
         <span className="text-xs font-semibold uppercase tracking-widest text-ink-dim cursor-default">Feel</span>
       </Tooltip>
       <Tooltip content={`Humanize: ${humanize}%`} position="bottom">
@@ -202,7 +216,7 @@ export function Transport({
 
   const swingSection = !easyMode ? (
     <div className="flex items-center gap-2">
-      <Tooltip content="Shuffle feel · 0 = straight · 100 = triplet swing" position="bottom">
+      <Tooltip content="Swing · 0 = straight (no shuffle) · 66 ≈ jazz triplet swing (2:1 ratio) · 100 = maximum" position="bottom">
         <span className="text-xs font-semibold uppercase tracking-widest text-ink-dim cursor-default">Swing</span>
       </Tooltip>
       <Tooltip content={`Swing: ${swing}%`} position="bottom">
@@ -278,8 +292,8 @@ export function Transport({
               <Tooltip content="Drag to adjust tempo" position="bottom">
                 <input
                   type="range"
-                  min={60}
-                  max={200}
+                  min={40}
+                  max={250}
                   step={1}
                   value={bpm}
                   onChange={(e) => onBpmChange(parseInt(e.target.value, 10))}
