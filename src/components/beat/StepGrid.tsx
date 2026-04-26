@@ -30,30 +30,52 @@ export function StepGrid({
   /** Tracks whether a paint drag is in progress and what value we're painting */
   const paintRef = useRef<{ value: boolean; lastStep: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  // Keep a live ref to steps so the pointermove handler always sees current values
+  const stepsRef = useRef(steps);
+  stepsRef.current = steps;
 
   useEffect(() => {
     function stop() { paintRef.current = null; }
     window.addEventListener("pointerup", stop);
-    window.addEventListener("touchend", stop);
+    window.addEventListener("pointercancel", stop);
     return () => {
       window.removeEventListener("pointerup", stop);
-      window.removeEventListener("touchend", stop);
+      window.removeEventListener("pointercancel", stop);
     };
   }, []);
 
-  /** Find which step index is under a given client coordinate */
+  /** Find which step button is under (x, y) by walking data-step attributes */
   const stepAtPoint = useCallback((x: number, y: number): number | null => {
-    const el = document.elementFromPoint(x, y);
-    if (!el) return null;
-    // Walk up to find a button with data-step
-    let node: Element | null = el;
-    while (node && node !== containerRef.current) {
-      const s = (node as HTMLElement).dataset?.step;
-      if (s !== undefined) return parseInt(s, 10);
-      node = node.parentElement;
+    // Use elementsFromPoint to check all layers (handles cases where pointer is
+    // over a child span inside the button, or briefly over a gap spacer)
+    const els = document.elementsFromPoint(x, y);
+    for (const el of els) {
+      let node: Element | null = el;
+      while (node) {
+        const s = (node as HTMLElement).dataset?.step;
+        if (s !== undefined) return parseInt(s, 10);
+        if (node === containerRef.current) break;
+        node = node.parentElement;
+      }
     }
     return null;
   }, []);
+
+  function handlePointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (disabled || !paintRef.current) return;
+    const step = stepAtPoint(e.clientX, e.clientY);
+    if (step === null || step === paintRef.current.lastStep) return;
+    // Paint all steps between lastStep and this one so fast drags don't skip cells
+    const from = paintRef.current.lastStep;
+    const to   = step;
+    const dir  = to > from ? 1 : -1;
+    for (let s = from + dir; s !== to + dir; s += dir) {
+      if (stepsRef.current[s] !== paintRef.current.value) {
+        onPaint(s, paintRef.current.value);
+      }
+    }
+    paintRef.current.lastStep = step;
+  }
 
   return (
     <div
@@ -61,15 +83,7 @@ export function StepGrid({
       className="flex gap-1 select-none touch-none"
       role="group"
       aria-label={`Track ${trackIndex + 1} steps`}
-      onPointerMove={(e) => {
-        if (disabled || !paintRef.current) return;
-        const step = stepAtPoint(e.clientX, e.clientY);
-        if (step === null || step === paintRef.current.lastStep) return;
-        if (steps[step] !== paintRef.current.value) {
-          paintRef.current.lastStep = step;
-          onPaint(step, paintRef.current.value);
-        }
-      }}
+      onPointerMove={handlePointerMove}
     >
       {steps.map((active, i) => {
         const label = noteLabels?.[i] ?? null;
@@ -93,6 +107,9 @@ export function StepGrid({
               onPointerDown={(e) => {
                 if (disabled || e.button !== 0) return;
                 e.preventDefault();
+                // Capture the pointer so move/up events keep firing even if the
+                // finger/cursor leaves the button or the container entirely
+                (e.currentTarget as HTMLButtonElement).setPointerCapture(e.pointerId);
                 const newVal = !active;
                 paintRef.current = { value: newVal, lastStep: i };
                 onPaintStart(i, newVal);

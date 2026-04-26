@@ -4,6 +4,26 @@ export interface SampleDef {
   url: string;
 }
 
+/** Each sound pack maps sample IDs to a URL prefix folder */
+export interface SoundPack {
+  id: string;
+  label: string;
+  emoji: string;
+  description: string;
+  /** Sub-folder under /samples/  e.g. "electronic" → /samples/electronic/kick.wav.
+   *  Empty string means the default /samples/ folder. */
+  folder: string;
+}
+
+export const SOUND_PACKS: SoundPack[] = [
+  { id: "acoustic",    label: "Acoustic",    emoji: "🥁", description: "Real drum kit recorded in a studio", folder: "" },
+  { id: "electronic",  label: "Electronic",  emoji: "🎛️", description: "Punchy synthesised 808/909-style sounds",  folder: "electronic" },
+  { id: "lofi",        label: "Lo-Fi",       emoji: "📼", description: "Dusty vinyl-flavoured hip-hop kit",         folder: "lofi" },
+  { id: "kids",        label: "Toy Kit",     emoji: "🧸", description: "Fun toy & cartoon sounds for young makers", folder: "kids" },
+];
+
+export const DEFAULT_PACK_ID = "acoustic";
+
 export const SAMPLES: SampleDef[] = [
   { id: "kick",       label: "🥁 Kick",        url: "/samples/kick.wav" },
   { id: "snare",      label: "🪘 Snare",        url: "/samples/snare.wav" },
@@ -30,6 +50,13 @@ export const SAMPLES: SampleDef[] = [
   { id: "chord",      label: "🎹 Chord",        url: "/samples/chord.wav" },
   { id: "synth",      label: "🎛️ Synth",        url: "/samples/synth.wav" },
 ];
+
+/** Build a URL for a sample given a pack folder.
+ *  Falls back to the default /samples/ folder if the pack-specific file is not expected. */
+export function sampleUrl(sampleId: string, packFolder: string): string {
+  if (!packFolder) return `/samples/${sampleId}.wav`;
+  return `/samples/${packFolder}/${sampleId}.wav`;
+}
 
 export function getSampleById(id: string): SampleDef | undefined {
   return SAMPLES.find((s) => s.id === id);

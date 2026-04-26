@@ -19,6 +19,8 @@ import { sendDrumNote, sendMelodicNote } from "@/lib/audio/midi";
 import { EuclideanDialog } from "@/components/beat/EuclideanDialog";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { autoSavePatterns, loadAutoSave } from "@/lib/session";
+import { SoundPackSwitcher } from "@/components/beat/SoundPackSwitcher";
+import { DEFAULT_PACK_ID } from "@/lib/audio/samples";
 
 export default function Home() {
   // Pattern A / B slots
@@ -78,6 +80,13 @@ export default function Home() {
   // Loop range — [startStep, endStep] inclusive, 0-indexed. null = full loop.
   const [loopRange, setLoopRange] = useState<[number, number] | null>(null);
   const loopRangeRef = useRef<[number, number] | null>(null);
+
+  // Sound pack
+  const [soundPackId, setSoundPackId] = useState(DEFAULT_PACK_ID);
+  const [soundPackLoading, setSoundPackLoading] = useState(false);
+
+  // Teach Me mode — shows notation strip below each track row
+  const [teachMode, setTeachMode] = useState(false);
 
   // Auto-save status toast
   const [autoSavedAt, setAutoSavedAt] = useState<number | null>(null);
@@ -373,6 +382,15 @@ export default function Home() {
 
   function handleColorChange(trackIndex: number, color: string) {
     updateTrack(trackIndex, (t) => ({ ...t, color }));
+  }
+
+  async function handleSoundPackSwitch(packId: string, folder: string) {
+    setSoundPackId(packId);
+    if (initialized) {
+      setSoundPackLoading(true);
+      await getEngine().loadSamplePack(folder);
+      setSoundPackLoading(false);
+    }
   }
 
   /** Click a step number while loop range is active to move the nearest endpoint */
@@ -815,8 +833,39 @@ export default function Home() {
             </button>
           </Tooltip>
 
-          {/* Push loop range to the right */}
+          {/* Push right-side controls to the right */}
           <div className="flex-1" />
+
+          {/* Teach Me toggle */}
+          <Tooltip content={teachMode ? "Hide notation — turn off Teach Me mode" : "Teach Me — see note values (quarter, eighth…) below each track"}>
+            <button
+              type="button"
+              onClick={() => setTeachMode((t) => !t)}
+              className={`h-7 px-3 flex items-center gap-1.5 rounded text-xs font-semibold transition-colors ${
+                teachMode
+                  ? "text-amber-300 bg-amber-500/20 hover:bg-amber-500/30 ring-1 ring-amber-500/40"
+                  : "text-ink-dim hover:text-ink hover:bg-well"
+              }`}
+              aria-pressed={teachMode}
+              aria-label={teachMode ? "Turn off Teach Me" : "Turn on Teach Me"}
+            >
+              <span aria-hidden="true">🎓</span>
+              Teach Me
+            </button>
+          </Tooltip>
+
+          {/* Divider */}
+          <div className="h-4 w-px bg-rim shrink-0" aria-hidden="true" />
+
+          {/* Sound pack switcher */}
+          <SoundPackSwitcher
+            currentPackId={soundPackId}
+            loading={soundPackLoading}
+            onSwitch={handleSoundPackSwitch}
+          />
+
+          {/* Divider */}
+          <div className="h-4 w-px bg-rim shrink-0" aria-hidden="true" />
 
           {/* Loop range toggle */}
           <Tooltip content={loopRange
@@ -914,6 +963,7 @@ export default function Home() {
               selectedNote={selectedNote}
               easyMode={easyMode}
               canPaste={!!clipboardTrack}
+              teachMode={teachMode}
               onDragHandlePointerDown={() => handleDragStart(i)}
               onPaintStart={(step, value) => {
                 pushHistory();

@@ -1,4 +1,4 @@
-import { SAMPLES, type SampleDef } from "./samples";
+import { SAMPLES, sampleUrl, type SampleDef } from "./samples";
 
 export class AudioEngine {
   private context: AudioContext | null = null;
@@ -8,6 +8,7 @@ export class AudioEngine {
   private buffers = new Map<string, AudioBuffer>();
   private trackGains = new Map<string, GainNode>();
   private initialized = false;
+  private currentPackFolder = "";
 
   async init(): Promise<void> {
     if (this.initialized) return;
@@ -30,12 +31,35 @@ export class AudioEngine {
     await Promise.all(
       SAMPLES.map(async (sample: SampleDef) => {
         try {
-          const res = await fetch(sample.url);
+          const url = sampleUrl(sample.id, this.currentPackFolder);
+          const res = await fetch(url);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const arrayBuf = await res.arrayBuffer();
           const audioBuffer = await this.context!.decodeAudioData(arrayBuf);
           this.buffers.set(sample.id, audioBuffer);
         } catch {
-          // silently skip missing samples in tests
+          // silently skip missing samples in tests / packs that don't have this sound
+        }
+      })
+    );
+  }
+
+  /** Switch to a different sound pack folder. Reloads all buffers from the new paths.
+   *  Falls back gracefully — if a file is missing in the pack it retains the previous buffer. */
+  async loadSamplePack(packFolder: string): Promise<void> {
+    if (!this.context || !this.initialized) return;
+    this.currentPackFolder = packFolder;
+    await Promise.all(
+      SAMPLES.map(async (sample: SampleDef) => {
+        try {
+          const url = sampleUrl(sample.id, packFolder);
+          const res = await fetch(url);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const arrayBuf = await res.arrayBuffer();
+          const audioBuffer = await this.context!.decodeAudioData(arrayBuf);
+          this.buffers.set(sample.id, audioBuffer);
+        } catch {
+          // file doesn't exist in this pack — keep the previously loaded buffer
         }
       })
     );

@@ -4,6 +4,7 @@ import { type TrackState } from "@/lib/pattern";
 import { NOTE_NAMES } from "@/lib/scales";
 import { SampleSelect } from "./SampleSelect";
 import { StepGrid } from "./StepGrid";
+import { NotationStrip } from "./NotationStrip";
 import { Toggle } from "@/components/ui/Toggle";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { TRACK_COLORS } from "@/lib/utils";
@@ -43,6 +44,7 @@ interface TrackRowProps {
   onPreviewSample?: (sampleId: string) => void;
   onOctaveOffsetChange?: (offset: number) => void;
   onColorChange?: (color: string) => void;
+  teachMode?: boolean;
 }
 
 export function TrackRow({
@@ -74,6 +76,7 @@ export function TrackRow({
   onPreviewSample,
   onOctaveOffsetChange,
   onColorChange,
+  teachMode = false,
 }: TrackRowProps) {
   const isMelody = track.type === "melody";
   const [editingName, setEditingName] = useState(false);
@@ -236,18 +239,27 @@ export function TrackRow({
         )}
       </div>
 
-      {/* Step grid */}
-      <StepGrid
-        steps={track.steps}
-        currentStep={isPlaying ? currentStep : null}
-        trackIndex={trackIndex}
-        trackColor={isMelody ? "#6366f1" : trackColor}
-        onPaintStart={onPaintStart}
-        onPaint={onPaint}
-        onVelocityChange={onVelocityChange}
-        noteLabels={noteLabels}
-        velocities={track.velocity}
-      />
+      {/* Step grid + optional notation strip */}
+      <div className="flex flex-col min-w-0 shrink overflow-visible">
+        <StepGrid
+          steps={track.steps}
+          currentStep={isPlaying ? currentStep : null}
+          trackIndex={trackIndex}
+          trackColor={isMelody ? "#6366f1" : trackColor}
+          onPaintStart={onPaintStart}
+          onPaint={onPaint}
+          onVelocityChange={onVelocityChange}
+          noteLabels={noteLabels}
+          velocities={track.velocity}
+        />
+        {teachMode && (
+          <NotationStrip
+            steps={track.steps}
+            currentStep={isPlaying ? currentStep : null}
+            isPlaying={isPlaying}
+          />
+        )}
+      </div>
 
       {/* Per-track volume + M/S + quick actions */}
       <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
