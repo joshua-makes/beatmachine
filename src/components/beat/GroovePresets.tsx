@@ -128,9 +128,10 @@ const SONG_GROOVES: SongDef[] = [
   },
   {
     // Traditional / public domain — most famous song in the world.
-    // Key of C. Rhythm: C(3) C(1) D(4) C(4) F(4) E(8) | C(3) C(1) D(4) C(4) G(4) F(8)
-    // In 16th steps (each beat = 4 steps, dotted-quarter = 3 steps):
-    // "Hap-py Birth-day to you" = C(3) C(1) D(4) C(4) F(4) E(4+rest)
+    // 3/4 melody fitted into 32 16th-note steps (2 bars of 4/4).
+    // Phrase 1 "Hap-py Birth-day to you": C(2) C(2) D(4) C(2) F(4) E(2)
+    // Phrase 2 "Hap-py Birth-day to you": C(2) C(2) D(4) C(2) G(4) F(2)
+    // D4 gets 4 steps (dotted-quarter feel) — the key rhythmic hook of the song.
     label: "Happy Birthday",
     artist: "Traditional",
     emoji: "🎂",
@@ -138,14 +139,14 @@ const SONG_GROOVES: SongDef[] = [
     bpm: 92,
     stepCount: 32,
     tracks: [
-      // Bar 1: Hap(C)-.-.  py(C) Birth(D)-.-.  day(C)-.-.  to(F)-.-.  you(E)-.-. rest
-      // Bar 2: Hap(C)-.-.  py(C) Birth(D)-.-.  day(C)-.-.  to(G)-.-.  you(F)-.-. rest
+      // Phrase 1: Hap(C) py(C) Birth(D).. day(C) to(F).. you(E)
+      // Phrase 2: Hap(C) py(C) Birth(D).. day(C) to(G).. you(F)
       {
         type: "melody",
         vol: 0.82,
         noteSeq: [
-          "C4",null,null,"C4","D4",null,null,null,"C4",null,null,null,"F4",null,null,null,
-          "E4",null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+          "C4",null,"C4",null,"D4",null,null,null,"C4",null,"F4",null,null,null,"E4",null,
+          "C4",null,"C4",null,"D4",null,null,null,"C4",null,"G4",null,null,null,"F4",null,
         ],
       },
       { sampleId: "kick",  steps: "X.......X.......X.......X.......", vol: 0.7 },
