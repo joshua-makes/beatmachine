@@ -244,7 +244,7 @@ export function TrackRow({
       </div>
 
       {/* Step grid + optional notation strip */}
-      <div className="flex flex-col min-w-0 shrink overflow-visible">
+      <div className="flex flex-col shrink-0 overflow-visible">
         <StepGrid
           steps={track.steps}
           currentStep={isPlaying ? currentStep : null}

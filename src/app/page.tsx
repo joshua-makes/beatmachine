@@ -902,7 +902,7 @@ export default function Home() {
         )}
 
         <div className="overflow-x-auto">
-        <div className="min-w-[700px]">
+        <div className="min-w-max">
           {/* Step number header */}
           <div className="flex items-center gap-3 px-2 py-1.5 border-b border-rim">
             {/* Spacer that matches the drag handle column (hidden on mobile like the handle) */}
