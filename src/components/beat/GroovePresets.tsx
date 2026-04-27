@@ -124,141 +124,224 @@ interface SongDef {
 const SONG_GROOVES: SongDef[] = [
   // ── PUBLIC DOMAIN ────────────────────────────────────────────────────────
   {
-    // Beethoven 9th, 4th movement (1824) — public domain.
-    // E-E-F-G | G-F-E-D | C-C-D-E | E(dotted)-D-D
+    // Beethoven 9th Sym, 4th mvt (1824) — public domain.
+    // One complete 4-bar phrase. Each quarter note = trigger step + 3 null spacers.
+    // Bar 1: E  E  F  G   Bar 2: G  F  E  D
+    // Bar 3: C  C  D  E   Bar 4: E.(dotted-quarter) D(8th) D(half)
     label: "Ode to Joy",
     artist: "Beethoven",
     emoji: "🎶",
-    description: "Beethoven's famous chorus — quarter notes, strings voice",
-    bpm: 104,
-    stepCount: 32,
+    description: "Beethoven's famous chorus — quarter notes, violin",
+    bpm: 108,
+    stepCount: 64,
     tracks: [
       {
         type: "melody", voice: "violin", vol: 0.82, name: "Strings",
-        noteSeq:  ["E4","E4","F4","G4","G4","F4","E4","D4","C4","C4","D4","E4","E4","D4","D4",null,
-                   "E4","E4","F4","G4","G4","F4","E4","D4","C4","C4","D4","E4","D4","C4","C4",null],
-        durations:[  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  3,  1,  4, null,
-                     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  4, null],
+        noteSeq: [
+          "E4",null,null,null, "E4",null,null,null, "F4",null,null,null, "G4",null,null,null,  // bar 1
+          "G4",null,null,null, "F4",null,null,null, "E4",null,null,null, "D4",null,null,null,  // bar 2
+          "C4",null,null,null, "C4",null,null,null, "D4",null,null,null, "E4",null,null,null,  // bar 3
+          "E4",null,null,null,null,null, "D4",null,  "D4",null,null,null,null,null,null,null,  // bar 4
+        ],
+        durations: [
+          4,null,null,null, 4,null,null,null, 4,null,null,null, 4,null,null,null,
+          4,null,null,null, 4,null,null,null, 4,null,null,null, 4,null,null,null,
+          4,null,null,null, 4,null,null,null, 4,null,null,null, 4,null,null,null,
+          6,null,null,null,null,null, 2,null, 8,null,null,null,null,null,null,null,
+        ],
       },
-      { sampleId: "kick",  steps: "X.......X.......X.......X.......", vol: 0.62 },
-      { sampleId: "snare", steps: "....X.......X.......X.......X...", vol: 0.58 },
-      { sampleId: "hat",   steps: "X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.", vol: 0.26 },
+      { sampleId: "kick",  steps: "X.......X.......X.......X.......X.......X.......X.......X.......", vol: 0.62 },
+      { sampleId: "snare", steps: "....X.......X.......X.......X.......X.......X.......X.......X...", vol: 0.54 },
+      { sampleId: "hat",   steps: "X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.", vol: 0.22 },
     ],
   },
   {
-    // Beethoven "Für Elise" opening theme (1810) — public domain.
+    // Beethoven "Für Elise" (1810) — public domain.
+    // 32 steps = 2 bars of 4/4. Opening 16th-note run then quarter-note melody.
+    // Bar 1: [E5 Eb5 E5 Eb5 E5 B4 D5 C5](16ths) A4(q) C4(8th) E4(8th)
+    // Bar 2: A4(q) rest(8th) B4(q) rest(8th) [E4 Ab4 B4 C5](16ths→loop)
     label: "Für Elise",
     artist: "Beethoven",
     emoji: "🌹",
-    description: "Beethoven's iconic piano piece — the opening theme",
-    bpm: 138,
+    description: "Beethoven's iconic piano piece — opening theme, piano",
+    bpm: 120,
     stepCount: 32,
     tracks: [
       {
-        type: "melody", voice: "piano", vol: 0.80, name: "Piano",
-        noteSeq:  ["E5","Eb5","E5","Eb5","E5","B4","D5","C5","A4",null,"C4","E4","A4",null,"B4",null,
-                   "E4","Ab4","B4","C5", null,null,null,null,"E5","Eb5","E5","Eb5","E5","B4","D5","C5"],
-        durations:[  1,   1,  1,   1,  1,  1,  1,  1,  4, null,  1,  1,  4, null,  4, null,
-                     1,   1,  1,  8, null,null,null,null,  1,   1,  1,   1,  1,  1,  1,  1],
+        type: "melody", voice: "piano", vol: 0.82, name: "Piano",
+        noteSeq: [
+          "E5","Eb5","E5","Eb5","E5","B4","D5","C5",  // steps  0-7:  fast 16th run
+          "A4", null, null, null,                      // steps  8-11: quarter A4
+          "C4", null, "E4", null,                      // steps 12-15: 8th C4, 8th E4
+          "A4", null, null, null,                      // steps 16-19: quarter A4
+           null, null,                                 // steps 20-21: 8th rest
+          "B4", null, null, null,                      // steps 22-25: quarter B4
+           null, null,                                 // steps 26-27: 8th rest
+          "E4","Ab4","B4","C5",                        // steps 28-31: ascending run into loop
+        ],
+        durations: [
+          1,  1,  1,  1,  1,  1,  1,  1,
+          4,null,null,null,
+          2,null, 2,null,
+          4,null,null,null,
+          null,null,
+          4,null,null,null,
+          null,null,
+          1,  1,  1,  1,
+        ],
       },
-      { sampleId: "kick",  steps: "X.......X.......X.......X.......", vol: 0.52 },
-      { sampleId: "snare", steps: "....X.......X.......X.......X...", vol: 0.48 },
-      { sampleId: "hat",   steps: "X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.", vol: 0.20 },
+      { sampleId: "kick",  steps: "X.......X.......X.......X.......", vol: 0.48 },
+      { sampleId: "hat",   steps: "X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.", vol: 0.18 },
     ],
   },
   {
-    // "Twinkle Twinkle" — French tune (1761), public domain.
+    // "Twinkle Twinkle Little Star" — French tune (1761), public domain.
+    // 4 phrases × 16 steps = 64 steps total. Quarter note = note + 3 nulls. Half note = note + 7 nulls.
+    // Phrase 1: C  C  G  G  |  A  A  G(half)
+    // Phrase 2: F  F  E  E  |  D  D  C(half)
+    // Phrase 3: G  G  F  F  |  E  E  D(half)
+    // Phrase 4: G  G  F  F  |  E  E  D(half)
     label: "Twinkle Twinkle",
     artist: "Traditional",
     emoji: "⭐",
-    description: "Classic nursery melody — bells voice, quarter notes",
-    bpm: 96,
-    stepCount: 32,
+    description: "Classic nursery rhyme — quarter & half notes, bells",
+    bpm: 100,
+    stepCount: 64,
     tracks: [
       {
         type: "melody", voice: "bell", vol: 0.80, name: "Bells",
-        noteSeq:  ["C4","C4","G4","G4","A4","A4","G4",null,"F4","F4","E4","E4","D4","D4","C4",null,
-                   "G4","G4","F4","F4","E4","E4","D4",null,"G4","G4","F4","F4","E4","E4","D4",null],
-        durations:[  2,  2,  2,  2,  2,  2,  4, null,  2,  2,  2,  2,  2,  2,  4, null,
-                     2,  2,  2,  2,  2,  2,  4, null,  2,  2,  2,  2,  2,  2,  4, null],
+        noteSeq: [
+          "C4",null,null,null, "C4",null,null,null, "G4",null,null,null, "G4",null,null,null,  // phrase 1a
+          "A4",null,null,null, "A4",null,null,null, "G4",null,null,null,null,null,null,null,   // phrase 1b (G half)
+          "F4",null,null,null, "F4",null,null,null, "E4",null,null,null, "E4",null,null,null,  // phrase 2a
+          "D4",null,null,null, "D4",null,null,null, "C4",null,null,null,null,null,null,null,   // phrase 2b (C half)
+        ],
+        durations: [
+          4,null,null,null, 4,null,null,null, 4,null,null,null, 4,null,null,null,
+          4,null,null,null, 4,null,null,null, 8,null,null,null,null,null,null,null,
+          4,null,null,null, 4,null,null,null, 4,null,null,null, 4,null,null,null,
+          4,null,null,null, 4,null,null,null, 8,null,null,null,null,null,null,null,
+        ],
       },
-      { sampleId: "kick",  steps: "X.......X.......X.......X.......", vol: 0.62 },
-      { sampleId: "snare", steps: "....X.......X.......X.......X...", vol: 0.58 },
-      { sampleId: "hat",   steps: "X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.", vol: 0.28 },
+      { sampleId: "kick",  steps: "X...X...X...X...X...X...X...X...X...X...X...X...X...X...X...X...", vol: 0.58 },
+      { sampleId: "snare", steps: "....X.......X.......X.......X.......X.......X.......X.......X...", vol: 0.54 },
+      { sampleId: "hat",   steps: "X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.", vol: 0.24 },
     ],
   },
   {
-    // "Happy Birthday" — Hill sisters (1893), public domain.
+    // "Happy Birthday to You" — Hill sisters (1893), public domain.
+    // 3/4 time. Pickup = two 8th notes "Hap-py". Each phrase = 24 steps.
+    // 2 phrases × 24 + 16 silence = 64 steps.
+    // Phrase 1: G(8th) G(8th) | A(q) G(q) C5(q) | B4(half)
+    // Phrase 2: G(8th) G(8th) | A(q) G(q) D5(q) | C5(half)
     label: "Happy Birthday",
     artist: "Traditional",
     emoji: "🎂",
-    description: "All 4 phrases — bells voice, dotted-quarter feel",
-    bpm: 92,
-    stepCount: 32,
+    description: "Two phrases in 3/4 — pickup 8th notes, bells",
+    bpm: 88,
+    stepCount: 64,
     tracks: [
       {
         type: "melody", voice: "bell", vol: 0.82, name: "Bells",
-        noteSeq:  ["G4","G4","A4",null,"G4","C5","B4",null,
-                   "G4","G4","A4",null,"G4","D5","C5",null,
-                   "G4","G4","G5","E4","C5","B4","A4",null,
-                   "F4","F4","E4",null,"C5","D5","C5",null],
-        durations:[  1,  1,  2, null,  2,  2,  4, null,
-                     1,  1,  2, null,  2,  2,  4, null,
-                     1,  1,  2,  2,   2,  2,  4, null,
-                     1,  1,  2, null,  2,  2,  4, null],
+        noteSeq: [
+          // phrase 1 — "Happy birthday to you"
+          "G4",null,"G4",null,                        // steps  0-3:  Hap-(8th) py(8th)
+          "A4",null,null,null,                        // steps  4-7:  birth-(q)
+          "G4",null,null,null,                        // steps  8-11: day-(q)
+          "C5",null,null,null,                        // steps 12-15: to-(q)
+          "B4",null,null,null,null,null,null,null,    // steps 16-23: you (half)
+          // phrase 2 — "Happy birthday to you"
+          "G4",null,"G4",null,                        // steps 24-27: Hap-(8th) py(8th)
+          "A4",null,null,null,                        // steps 28-31: birth-(q)
+          "G4",null,null,null,                        // steps 32-35: day-(q)
+          "D5",null,null,null,                        // steps 36-39: to-(q)
+          "C5",null,null,null,null,null,null,null,    // steps 40-47: you (half)
+          // silence to fill to 64 steps
+          null,null,null,null,null,null,null,null,    // steps 48-55
+          null,null,null,null,null,null,null,null,    // steps 56-63
+        ],
+        durations: [
+          2,null,2,null,
+          4,null,null,null,
+          4,null,null,null,
+          4,null,null,null,
+          8,null,null,null,null,null,null,null,
+          2,null,2,null,
+          4,null,null,null,
+          4,null,null,null,
+          4,null,null,null,
+          8,null,null,null,null,null,null,null,
+          null,null,null,null,null,null,null,null,
+          null,null,null,null,null,null,null,null,
+        ],
       },
-      { sampleId: "kick",  steps: "X.......X.......X.......X.......", vol: 0.65 },
-      { sampleId: "snare", steps: "....X.......X.......X.......X...", vol: 0.60 },
-      { sampleId: "hat",   steps: "X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.", vol: 0.26 },
+      { sampleId: "kick",  steps: "X...X...X...X...X...X...X...X...X...X...X...X...X...X...X...X...", vol: 0.60 },
+      { sampleId: "hat",   steps: "X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.", vol: 0.20 },
     ],
   },
   {
     // "Mary Had a Little Lamb" — public domain.
+    // 4 bars × 16 steps = 64 steps. Quarter = note+3 nulls, half = note+7 nulls.
+    // Bar 1: E  D  C  D   Bar 2: E  E  E(half)
+    // Bar 3: D  D  D(half)  Bar 4: E  G  G(half)
     label: "Mary Had a Lamb",
     artist: "Traditional",
     emoji: "🐑",
-    description: "Only 3 notes — E, D, C. Perfect for beginners. Flute voice.",
+    description: "Simple 3-note melody — E D C. Great for beginners. Flute.",
     bpm: 100,
-    stepCount: 32,
+    stepCount: 64,
     tracks: [
       {
         type: "melody", voice: "flute", vol: 0.80, name: "Flute",
-        noteSeq:  ["E4","D4","C4","D4","E4","E4","E4",null,"D4","D4","D4",null,"E4","G4","G4",null,
-                   "E4","D4","C4","D4","E4","E4","E4","E4","D4","D4","E4","D4","C4",null,null,null],
-        durations:[  2,  2,  2,  2,  2,  2,  4, null,  2,  2,  4, null,  2,  2,  4, null,
-                     2,  2,  2,  2,  2,  2,  2,  2,   2,  2,  2,  2,   4, null,null,null],
+        noteSeq: [
+          "E4",null,null,null, "D4",null,null,null, "C4",null,null,null, "D4",null,null,null,  // bar 1
+          "E4",null,null,null, "E4",null,null,null, "E4",null,null,null,null,null,null,null,   // bar 2
+          "D4",null,null,null, "D4",null,null,null, "D4",null,null,null,null,null,null,null,   // bar 3
+          "E4",null,null,null, "G4",null,null,null, "G4",null,null,null,null,null,null,null,   // bar 4
+        ],
+        durations: [
+          4,null,null,null, 4,null,null,null, 4,null,null,null, 4,null,null,null,
+          4,null,null,null, 4,null,null,null, 8,null,null,null,null,null,null,null,
+          4,null,null,null, 4,null,null,null, 8,null,null,null,null,null,null,null,
+          4,null,null,null, 4,null,null,null, 8,null,null,null,null,null,null,null,
+        ],
       },
-      { sampleId: "kick",  steps: "X.......X.......X.......X.......", vol: 0.62 },
-      { sampleId: "snare", steps: "....X.......X.......X.......X...", vol: 0.58 },
-      { sampleId: "hat",   steps: "X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.", vol: 0.26 },
+      { sampleId: "kick",  steps: "X...X...X...X...X...X...X...X...X...X...X...X...X...X...X...X...", vol: 0.60 },
+      { sampleId: "snare", steps: "....X.......X.......X.......X.......X.......X.......X.......X...", vol: 0.55 },
+      { sampleId: "hat",   steps: "X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.", vol: 0.24 },
     ],
   },
   // ── GENRE PATTERNS ───────────────────────────────────────────────────────
-  // Original educational patterns in a genre style — not copies of any song.
   {
-    // Blues rock — pentatonic minor riff, guitar voice
+    // Blues pentatonic riff in A minor. Quarter = note+3 nulls, 8th = note+1 null.
+    // Phrase: A2(q) [C3 D3 Eb3 D3 C3](8ths) A2(half) | repeat with variation
     label: "Blues Rock",
     artist: "Genre",
     emoji: "🎸",
-    description: "Pentatonic minor guitar riff — classic blues/rock feel",
-    bpm: 100,
+    description: "12-bar blues riff in A — pentatonic minor guitar",
+    bpm: 96,
     stepCount: 32,
     tracks: [
       {
         type: "melody", voice: "guitar", vol: 0.82, name: "Guitar",
-        noteSeq:  ["A2","A2","C3","D3","Eb3","D3","C3","A2","A2","A2","C3","D3","E3","G3","E3","A3",
-                   "D3","D3","F3","G3","Ab3","G3","F3","D3","A2","A2","C3","D3","E3",null,null,null],
-        durations:[  1,  1,  1,  1,   1,  1,  1,  2,  1,  1,  1,  1,  1,  1,  4, null,
-                     1,  1,  1,  1,   1,  1,  1,  2,  1,  1,  1,  1,  4, null,null,null],
+        noteSeq: [
+          "A2",null,null,null, "C3",null,"D3",null, "Eb3",null,"D3",null, "C3",null,null,null,  // bar 1
+          "A2",null,null,null, "C3",null,"D3",null, "Eb3",null,"D3",null, "A2",null,null,null,  // bar 2
+        ],
+        durations: [
+          4,null,null,null, 2,null,2,null, 2,null,2,null, 4,null,null,null,
+          4,null,null,null, 2,null,2,null, 2,null,2,null, 4,null,null,null,
+        ],
       },
       { sampleId: "kick",      steps: "X...X.X.....X...X...X.X.....X...", vol: 0.82 },
       { sampleId: "snare",     steps: "....X.......X.......X.......X...", vol: 0.78 },
-      { sampleId: "hat",       steps: "X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.", vol: 0.40 },
-      { sampleId: "floor-tom", steps: "..............X...............X.", vol: 0.62 },
+      { sampleId: "hat",       steps: "X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.", vol: 0.38 },
+      { sampleId: "floor-tom", steps: "..............X...............X.", vol: 0.60 },
     ],
   },
   {
-    // Funk — organ/keys, syncopated kick, conga
+    // Funk organ stabs on offbeats — 8th-note chops with syncopation.
+    // 8th note stab = note+1 null, quarter = note+3 nulls, half = note+7 nulls.
     label: "Funk Groove",
     artist: "Genre",
     emoji: "🎺",
@@ -268,31 +351,41 @@ const SONG_GROOVES: SongDef[] = [
     tracks: [
       {
         type: "melody", voice: "organ", vol: 0.78, name: "Keys",
-        noteSeq:  ["Eb3",null,"Eb3",null,"Gb3",null,"Eb3","Ab3","Eb3",null,"Eb3",null,"Gb3","Bb3","Ab3",null,
-                   "Eb3",null,"Eb3",null,"Gb3",null,"Eb3","Ab3","Eb3",null,"Ab3",null,"Gb3",null,null,null],
-        durations:[  1, null,  1, null,  1, null,  1,  1,  1, null,  1, null,  1,  1,  2, null,
-                     1, null,  1, null,  1, null,  1,  1,  1, null,  2, null,  4, null,null,null],
+        noteSeq: [
+          "Eb3",null, null,null, "Eb3",null, "Gb3",null, "Eb3",null, null,null, "Ab3",null, null,null,  // bar 1
+          "Eb3",null, null,null, "Eb3",null, "Gb3",null, "Bb3",null, "Ab3",null, null,null, null,null,  // bar 2
+        ],
+        durations: [
+          2,null, null,null, 2,null, 2,null, 2,null, null,null, 4,null, null,null,
+          2,null, null,null, 2,null, 2,null, 2,null, 4,null, null,null, null,null,
+        ],
       },
       { sampleId: "kick",  steps: "X......X...X..X.X......X...X..X.", vol: 0.84 },
       { sampleId: "snare", steps: "....X.......X.......X.......X...", vol: 0.80 },
-      { sampleId: "hat",   steps: "X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.", vol: 0.38 },
+      { sampleId: "hat",   steps: "X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.", vol: 0.38 },
       { sampleId: "conga", steps: "..X.....X.X.....X...X.X.....X...", vol: 0.56 },
-      { sampleId: "snap",  steps: "........X...............X.......", vol: 0.62 },
     ],
   },
   {
-    // Hip-hop — piano chords over boom-bap drums
+    // Boom bap piano stabs — quarter and half note chops.
+    // Quarter = note+3 nulls, 8th = note+1 null.
     label: "Boom Bap",
     artist: "Genre",
     emoji: "🎤",
-    description: "90s boom-bap — heavy snare, piano chord stabs",
+    description: "90s hip-hop — heavy snare, piano chord stabs",
     bpm: 87,
     stepCount: 16,
     tracks: [
       {
         type: "melody", voice: "piano", vol: 0.72, name: "Piano",
-        noteSeq:  ["D3",null,null,"C3","A2",null,null,null,"F3",null,null,"E3","C3",null,null,null],
-        durations:[  2, null,null,  2,  4, null,null,null,  2, null,null,  2,  4, null,null,null],
+        noteSeq: [
+          "D3",null,null,null, null,null, "C3",null,  // steps 0-7:  D3(q) rest(8th) C3(8th)
+          "A2",null,null,null, null,null,null,null,   // steps 8-15: A2(half)
+        ],
+        durations: [
+          4,null,null,null, null,null, 2,null,
+          8,null,null,null, null,null,null,null,
+        ],
       },
       { sampleId: "kick",  steps: "X...X.......X...", vol: 0.86 },
       { sampleId: "snare", steps: "....X.......X...", vol: 0.82 },
@@ -301,37 +394,47 @@ const SONG_GROOVES: SongDef[] = [
     ],
   },
   {
-    // Jazz swing — ii-V-I chord walk, piano + rim
+    // Jazz walking bass ii-V-I in C. Quarter-note walk = note+3 nulls.
+    // Dm7: D F A C | G7: G B D F | Cmaj7: C E G B | C(whole)
     label: "Jazz Swing",
     artist: "Genre",
     emoji: "🎷",
-    description: "Swing 8ths — ii-V-I in C major, piano voicing, ride cymbal",
+    description: "Swing feel — ii-V-I walking bass in C, piano",
     bpm: 120,
-    stepCount: 16,
+    stepCount: 64,
     tracks: [
       {
         type: "melody", voice: "piano", vol: 0.70, name: "Piano",
-        noteSeq:  ["D3","F3","A3","C4","G2","B3","D4","F4","C3","E3","G3","B3","C4",null,null,null],
-        durations:[  1,  1,  1,  2,  1,  1,  1,  2,  1,  1,  1,  2,  4, null,null,null],
+        noteSeq: [
+          "D3",null,null,null, "F3",null,null,null, "A3",null,null,null, "C4",null,null,null,  // Dm7
+          "G2",null,null,null, "B3",null,null,null, "D4",null,null,null, "F4",null,null,null,  // G7
+          "C3",null,null,null, "E3",null,null,null, "G3",null,null,null, "B3",null,null,null,  // Cmaj7
+          "C4",null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,    // C whole
+        ],
+        durations: [
+          4,null,null,null, 4,null,null,null, 4,null,null,null, 4,null,null,null,
+          4,null,null,null, 4,null,null,null, 4,null,null,null, 4,null,null,null,
+          4,null,null,null, 4,null,null,null, 4,null,null,null, 4,null,null,null,
+          16,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+        ],
       },
-      { sampleId: "kick",    steps: "X.......X.......", vol: 0.55 },
-      { sampleId: "rimshot", steps: "....X.......X...", vol: 0.62 },
-      { sampleId: "hat",     steps: "X.X.X.X.X.X.X.X.", vol: 0.36 },
+      { sampleId: "kick",    steps: "X.......X.......X.......X.......X.......X.......X.......X.......", vol: 0.55 },
+      { sampleId: "rimshot", steps: "....X.......X.......X.......X.......X.......X.......X.......X...", vol: 0.62 },
+      { sampleId: "hat",     steps: "X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.", vol: 0.36 },
     ],
   },
   {
-    // Reggae one-drop with organ skank
     label: "Reggae",
     artist: "Genre",
     emoji: "🌴",
-    description: "One-drop kick on beat 3 — organ chord skank, offbeat feel",
+    description: "One-drop — kick on beat 3, organ chord skank on offbeats",
     bpm: 82,
     stepCount: 16,
     tracks: [
       {
         type: "melody", voice: "organ", vol: 0.68, name: "Organ",
         noteSeq:  [null,"G3",null,null,null,"G3",null,null,null,"C4",null,null,null,"C4",null,null],
-        durations:[null,  1, null,null,null,  1, null,null,null,  1, null,null,null,  1, null,null],
+        durations:[null,  2, null,null,null,  2, null,null,null,  2, null,null,null,  2, null,null],
       },
       { sampleId: "kick",     steps: "........X.......", vol: 0.80 },
       { sampleId: "rimshot",  steps: "....X.......X...", vol: 0.70 },
@@ -340,18 +443,22 @@ const SONG_GROOVES: SongDef[] = [
     ],
   },
   {
-    // Bossa Nova — guitar chords on clave
+    // Bossa Nova Amaj7 arpeggio — quarter-note chord tones on 3-2 clave feel.
     label: "Bossa Nova",
     artist: "Genre",
     emoji: "🎸",
-    description: "Brazilian bossa — guitar chords on 3-2 clave, light percussion",
+    description: "Brazilian bossa — guitar chords on 3-2 clave",
     bpm: 105,
     stepCount: 16,
     tracks: [
       {
         type: "melody", voice: "guitar", vol: 0.70, name: "Guitar",
-        noteSeq:  ["A3",null,"C#4","E4",null,"A3",null,null,"A3",null,"E4",null,"C#4",null,null,null],
-        durations:[  2, null,  1,   2, null,  2, null,null,  2, null,  2, null,  2,  null,null,null],
+        noteSeq: [
+          "A3",null,null,null, "E4",null, "A3",null, "C#4",null,null,null, "E4",null,null,null,
+        ],
+        durations: [
+          4,null,null,null, 2,null, 2,null, 4,null,null,null, 4,null,null,null,
+        ],
       },
       { sampleId: "kick",      steps: "X.......X.......", vol: 0.62 },
       { sampleId: "rimshot",   steps: "..X.X.......X.X.", vol: 0.65 },
