@@ -44,7 +44,7 @@ function makePattern(
     steps: s(d.steps),
     notes: Array(stepCount).fill(null) as (number | null)[],
     velocity: Array(stepCount).fill(1) as number[],
-    probability: Array(stepCount).fill(1) as number[],
+    probability: 1,
   }));
 
   const pianoTracks = melodyDefs.map((m, i) => {
@@ -63,7 +63,7 @@ function makePattern(
       mute: false, solo: false,
       steps, notes,
       velocity: Array(m.noteSeq.length).fill(1) as number[],
-      probability: Array(m.noteSeq.length).fill(1) as number[],
+      probability: 1,
       durations: durs,
     };
   });
@@ -76,7 +76,7 @@ function makePattern(
       steps: Array(stepCount).fill(false) as boolean[],
       notes: Array(stepCount).fill(null) as (number | null)[],
       velocity: Array(stepCount).fill(1) as number[],
-      probability: Array(stepCount).fill(1) as number[],
+      probability: 1,
     });
   }
   if (pianoTracks.length === 0) {
@@ -87,7 +87,7 @@ function makePattern(
       steps: Array(stepCount).fill(false) as boolean[],
       notes: Array(stepCount).fill(null) as (number | null)[],
       velocity: Array(stepCount).fill(1) as number[],
-      probability: Array(stepCount).fill(1) as number[],
+      probability: 1,
       durations: Array(stepCount).fill(1) as number[],
     });
   }
@@ -311,161 +311,6 @@ const SONG_GROOVES: SongDef[] = [
       { sampleId: "hat",   steps: "X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.", vol: 0.24 },
     ],
   },
-  // ── GENRE PATTERNS ───────────────────────────────────────────────────────
-  {
-    // Blues pentatonic riff in A minor. Quarter = note+3 nulls, 8th = note+1 null.
-    // Phrase: A2(q) [C3 D3 Eb3 D3 C3](8ths) A2(half) | repeat with variation
-    label: "Blues Rock",
-    artist: "Genre",
-    emoji: "🎸",
-    description: "12-bar blues riff in A — pentatonic minor guitar",
-    bpm: 96,
-    stepCount: 32,
-    tracks: [
-      {
-        type: "melody", voice: "guitar", vol: 0.82, name: "Guitar",
-        noteSeq: [
-          "A2",null,null,null, "C3",null,"D3",null, "Eb3",null,"D3",null, "C3",null,null,null,  // bar 1
-          "A2",null,null,null, "C3",null,"D3",null, "Eb3",null,"D3",null, "A2",null,null,null,  // bar 2
-        ],
-        durations: [
-          4,null,null,null, 2,null,2,null, 2,null,2,null, 4,null,null,null,
-          4,null,null,null, 2,null,2,null, 2,null,2,null, 4,null,null,null,
-        ],
-      },
-      { sampleId: "kick",      steps: "X...X.X.....X...X...X.X.....X...", vol: 0.82 },
-      { sampleId: "snare",     steps: "....X.......X.......X.......X...", vol: 0.78 },
-      { sampleId: "hat",       steps: "X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.", vol: 0.38 },
-      { sampleId: "floor-tom", steps: "..............X...............X.", vol: 0.60 },
-    ],
-  },
-  {
-    // Funk organ stabs on offbeats — 8th-note chops with syncopation.
-    // 8th note stab = note+1 null, quarter = note+3 nulls, half = note+7 nulls.
-    label: "Funk Groove",
-    artist: "Genre",
-    emoji: "🎺",
-    description: "Tight funk — organ chords, syncopated kick, conga groove",
-    bpm: 98,
-    stepCount: 32,
-    tracks: [
-      {
-        type: "melody", voice: "organ", vol: 0.78, name: "Keys",
-        noteSeq: [
-          "Eb3",null, null,null, "Eb3",null, "Gb3",null, "Eb3",null, null,null, "Ab3",null, null,null,  // bar 1
-          "Eb3",null, null,null, "Eb3",null, "Gb3",null, "Bb3",null, "Ab3",null, null,null, null,null,  // bar 2
-        ],
-        durations: [
-          2,null, null,null, 2,null, 2,null, 2,null, null,null, 4,null, null,null,
-          2,null, null,null, 2,null, 2,null, 2,null, 4,null, null,null, null,null,
-        ],
-      },
-      { sampleId: "kick",  steps: "X......X...X..X.X......X...X..X.", vol: 0.84 },
-      { sampleId: "snare", steps: "....X.......X.......X.......X...", vol: 0.80 },
-      { sampleId: "hat",   steps: "X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.", vol: 0.38 },
-      { sampleId: "conga", steps: "..X.....X.X.....X...X.X.....X...", vol: 0.56 },
-    ],
-  },
-  {
-    // Boom bap piano stabs — quarter and half note chops.
-    // Quarter = note+3 nulls, 8th = note+1 null.
-    label: "Boom Bap",
-    artist: "Genre",
-    emoji: "🎤",
-    description: "90s hip-hop — heavy snare, piano chord stabs",
-    bpm: 87,
-    stepCount: 16,
-    tracks: [
-      {
-        type: "melody", voice: "piano", vol: 0.72, name: "Piano",
-        noteSeq: [
-          "D3",null,null,null, null,null, "C3",null,  // steps 0-7:  D3(q) rest(8th) C3(8th)
-          "A2",null,null,null, null,null,null,null,   // steps 8-15: A2(half)
-        ],
-        durations: [
-          4,null,null,null, null,null, 2,null,
-          8,null,null,null, null,null,null,null,
-        ],
-      },
-      { sampleId: "kick",  steps: "X...X.......X...", vol: 0.86 },
-      { sampleId: "snare", steps: "....X.......X...", vol: 0.82 },
-      { sampleId: "hat",   steps: "..X...X...X...X.", vol: 0.42 },
-      { sampleId: "snap",  steps: "........X.......", vol: 0.65 },
-    ],
-  },
-  {
-    // Jazz walking bass ii-V-I in C. Quarter-note walk = note+3 nulls.
-    // Dm7: D F A C | G7: G B D F | Cmaj7: C E G B | C(whole)
-    label: "Jazz Swing",
-    artist: "Genre",
-    emoji: "🎷",
-    description: "Swing feel — ii-V-I walking bass in C, piano",
-    bpm: 120,
-    stepCount: 64,
-    tracks: [
-      {
-        type: "melody", voice: "piano", vol: 0.70, name: "Piano",
-        noteSeq: [
-          "D3",null,null,null, "F3",null,null,null, "A3",null,null,null, "C4",null,null,null,  // Dm7
-          "G2",null,null,null, "B3",null,null,null, "D4",null,null,null, "F4",null,null,null,  // G7
-          "C3",null,null,null, "E3",null,null,null, "G3",null,null,null, "B3",null,null,null,  // Cmaj7
-          "C4",null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,    // C whole
-        ],
-        durations: [
-          4,null,null,null, 4,null,null,null, 4,null,null,null, 4,null,null,null,
-          4,null,null,null, 4,null,null,null, 4,null,null,null, 4,null,null,null,
-          4,null,null,null, 4,null,null,null, 4,null,null,null, 4,null,null,null,
-          16,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
-        ],
-      },
-      { sampleId: "kick",    steps: "X.......X.......X.......X.......X.......X.......X.......X.......", vol: 0.55 },
-      { sampleId: "rimshot", steps: "....X.......X.......X.......X.......X.......X.......X.......X...", vol: 0.62 },
-      { sampleId: "hat",     steps: "X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.", vol: 0.36 },
-    ],
-  },
-  {
-    label: "Reggae",
-    artist: "Genre",
-    emoji: "🌴",
-    description: "One-drop — kick on beat 3, organ chord skank on offbeats",
-    bpm: 82,
-    stepCount: 16,
-    tracks: [
-      {
-        type: "melody", voice: "organ", vol: 0.68, name: "Organ",
-        noteSeq:  [null,"G3",null,null,null,"G3",null,null,null,"C4",null,null,null,"C4",null,null],
-        durations:[null,  2, null,null,null,  2, null,null,null,  2, null,null,null,  2, null,null],
-      },
-      { sampleId: "kick",     steps: "........X.......", vol: 0.80 },
-      { sampleId: "rimshot",  steps: "....X.......X...", vol: 0.70 },
-      { sampleId: "open-hat", steps: "..X...X...X...X.", vol: 0.60 },
-      { sampleId: "hat",      steps: "X.X.X.X.X.X.X.X.", vol: 0.26 },
-    ],
-  },
-  {
-    // Bossa Nova Amaj7 arpeggio — quarter-note chord tones on 3-2 clave feel.
-    label: "Bossa Nova",
-    artist: "Genre",
-    emoji: "🎸",
-    description: "Brazilian bossa — guitar chords on 3-2 clave",
-    bpm: 105,
-    stepCount: 16,
-    tracks: [
-      {
-        type: "melody", voice: "guitar", vol: 0.70, name: "Guitar",
-        noteSeq: [
-          "A3",null,null,null, "E4",null, "A3",null, "C#4",null,null,null, "E4",null,null,null,
-        ],
-        durations: [
-          4,null,null,null, 2,null, 2,null, 4,null,null,null, 4,null,null,null,
-        ],
-      },
-      { sampleId: "kick",      steps: "X.......X.......", vol: 0.62 },
-      { sampleId: "rimshot",   steps: "..X.X.......X.X.", vol: 0.65 },
-      { sampleId: "shaker",    steps: "X.X.X.X.X.X.X.X.", vol: 0.50 },
-      { sampleId: "woodblock", steps: "X..X..X...X.X...", vol: 0.60 },
-    ],
-  },
 ];
 
 // ── Genre starter grooves ─────────────────────────────────────────────────────
@@ -474,48 +319,50 @@ interface GrooveDef {
   emoji: string;
   description: string;
   bpm: number;
-  tracks: { sampleId: string; steps: StepStr; vol?: number }[];
+  stepCount?: 8 | 16 | 32 | 64;
+  tracks: TrackDef[];
 }
 
 const GROOVES: GrooveDef[] = [
   {
     label: "Pop",
     emoji: "🎵",
-    description: "4-on-the-floor kick, snare on 2 & 4, 8th-note hats",
+    description: "Driving kick, layered clap & snare, open-hat upbeats, 16th shaker shimmer",
     bpm: 120,
     tracks: [
-      { sampleId: "kick",     steps: "X...X...X...X..." },
-      { sampleId: "snare",    steps: "....X.......X..." },
-      { sampleId: "hat",      steps: "X.X.X.X.X.X.X.X." },
-      { sampleId: "open-hat", steps: "...X...X...X...X" },
-      { sampleId: "clap",     steps: "....X.......X...", vol: 0.6 },
-      { sampleId: "crash",    steps: "X...............", vol: 0.7 },
+      { sampleId: "kick",     steps: "X...X..X.X..X...", vol: 0.88 },
+      { sampleId: "snare",    steps: "....X.......X...", vol: 0.82 },
+      { sampleId: "hat",      steps: "X.X.X.X.X.X.X.X.", vol: 0.50 },
+      { sampleId: "open-hat", steps: "..X...X...X...X.", vol: 0.48 },
+      { sampleId: "clap",     steps: "....X.......X...", vol: 0.72 },
+      { sampleId: "shaker",   steps: "X.X.X.X.X.X.X.X.", vol: 0.28 },
+      { sampleId: "crash",    steps: "X...............", vol: 0.65 },
     ],
   },
   {
     label: "Hip-Hop",
     emoji: "🎤",
-    description: "Boom-bap — heavy kick, snare on 2 & 4, offbeat hats",
+    description: "Classic boom-bap — syncopated kick, snare on 2 & 4, sub bass",
     bpm: 88,
     tracks: [
-      { sampleId: "kick",  steps: "X...X.......X..." },
-      { sampleId: "snare", steps: "....X.......X..." },
-      { sampleId: "hat",   steps: "..X...X...X...X." },
-      { sampleId: "snap",  steps: "........X......." },
-      { sampleId: "sub",   steps: "X.......X.......", vol: 0.7 },
+      { sampleId: "kick",  steps: "X...X.X.....X...", vol: 0.90 },
+      { sampleId: "snare", steps: "....X.......X...", vol: 0.85 },
+      { sampleId: "hat",   steps: "..X...X...X...X.", vol: 0.40 },
+      { sampleId: "snap",  steps: "........X.......", vol: 0.68 },
+      { sampleId: "sub",   steps: "X.......X.......", vol: 0.75 },
     ],
   },
   {
     label: "Rock",
     emoji: "🤘",
-    description: "Driving kick with double on beat 3, hard snare, straight 8th hats",
-    bpm: 125,
+    description: "Kick on 1, 2 & 3 with double, hard snare on 2 & 4, straight 8th hats",
+    bpm: 120,
     tracks: [
-      { sampleId: "kick",      steps: "X...X...X.X.X..." },
-      { sampleId: "snare",     steps: "....X.......X..." },
-      { sampleId: "hat",       steps: "X.X.X.X.X.X.X.X." },
-      { sampleId: "crash",     steps: "X...............", vol: 0.8 },
-      { sampleId: "floor-tom", steps: "..............X." },
+      { sampleId: "kick",      steps: "X...X...X.X.....", vol: 0.90 },
+      { sampleId: "snare",     steps: "....X.......X...", vol: 0.85 },
+      { sampleId: "hat",       steps: "X.X.X.X.X.X.X.X.", vol: 0.48 },
+      { sampleId: "crash",     steps: "X...............", vol: 0.82 },
+      { sampleId: "floor-tom", steps: "..............X.", vol: 0.68 },
     ],
   },
   {
@@ -534,79 +381,194 @@ const GROOVES: GrooveDef[] = [
   {
     label: "Reggae",
     emoji: "🌴",
-    description: "One-drop — kick only on beat 3, offbeat skank feel",
+    description: "One-drop — kick on beat 3 only, organ skank on every upbeat",
     bpm: 82,
     tracks: [
-      { sampleId: "kick",      steps: "........X......." },
-      { sampleId: "rimshot",   steps: "....X.......X..." },
-      { sampleId: "open-hat",  steps: "..X...X...X...X." },
-      { sampleId: "hat",       steps: "X.X.X.X.X.X.X.X.", vol: 0.5 },
-      { sampleId: "woodblock", steps: "X..X..X.X..X..X.", vol: 0.6 },
+      {
+        type: "melody", voice: "organ", vol: 0.72, name: "Skank",
+        noteSeq:  [null,null,"G3",null, null,null,"G3",null, null,null,"G3",null, null,null,"G3",null],
+        durations:[null,null,  2, null, null,null,  2, null, null,null,  2, null, null,null,  2, null],
+      },
+      { sampleId: "kick",     steps: "........X.......", vol: 0.82 },
+      { sampleId: "rimshot",  steps: "....X.......X...", vol: 0.72 },
+      { sampleId: "open-hat", steps: "..X...X...X...X.", vol: 0.62 },
+      { sampleId: "hat",      steps: "X.X.X.X.X.X.X.X.", vol: 0.22 },
     ],
   },
   {
     label: "House",
     emoji: "🏠",
-    description: "Four-on-the-floor with clap, upbeat hats, shaker drive",
+    description: "Four-on-the-floor, clap on 2 & 4, open-hat on the 'and', 16th shaker",
     bpm: 126,
     tracks: [
-      { sampleId: "kick",     steps: "X...X...X...X..." },
-      { sampleId: "clap",     steps: "....X.......X..." },
-      { sampleId: "hat",      steps: "..X...X...X...X." },
-      { sampleId: "open-hat", steps: "X.......X......." },
-      { sampleId: "shaker",   steps: "X.X.X.X.X.X.X.X.", vol: 0.5 },
+      { sampleId: "kick",     steps: "X...X...X...X...", vol: 0.90 },
+      { sampleId: "clap",     steps: "....X.......X...", vol: 0.80 },
+      { sampleId: "hat",      steps: "..X...X...X...X.", vol: 0.50 },
+      { sampleId: "open-hat", steps: "......X.......X.", vol: 0.72 },
+      { sampleId: "shaker",   steps: "X.X.X.X.X.X.X.X.", vol: 0.42 },
     ],
   },
   {
     label: "Trap",
     emoji: "🌡️",
-    description: "Sparse syncopated kick, snappy clap, rolling 16th hi-hats with open-hat accents",
+    description: "808 sub, 16th hi-hat rolls, sparse kick — Atlanta trap signature",
     bpm: 130,
     tracks: [
-      { sampleId: "kick",      steps: "X.....X.X......." },
-      { sampleId: "clap",      steps: "....X.......X..." },
-      { sampleId: "hat",       steps: "X.X.X.X.X.X.X.X.", vol: 0.45 },
-      { sampleId: "open-hat",  steps: "......X.......X.", vol: 0.65 },
-      { sampleId: "snap",      steps: "....X.......X...", vol: 0.7  },
+      { sampleId: "kick",      steps: "X.......X.X.....", vol: 0.92 },
+      { sampleId: "clap",      steps: "....X.......X...", vol: 0.85 },
+      { sampleId: "hat",       steps: "XXXXXXXXXXXXXXXX", vol: 0.28 },
+      { sampleId: "open-hat",  steps: "......X.......X.", vol: 0.68 },
+      { sampleId: "snap",      steps: "....X.......X...", vol: 0.72 },
+      { sampleId: "sub",       steps: "X.......X.......", vol: 0.88 },
     ],
   },
   {
     label: "Disco",
     emoji: "🪩",
-    description: "4-on-the-floor with open-hat offbeats and tambourine",
+    description: "4-on-the-floor, snare on 2 & 4, open-hat on the '&', tambourine shimmer",
     bpm: 116,
     tracks: [
-      { sampleId: "kick",       steps: "X...X...X...X..." },
-      { sampleId: "snare",      steps: "....X.......X..." },
-      { sampleId: "hat",        steps: "X.X.X.X.X.X.X.X." },
-      { sampleId: "open-hat",   steps: "...X...X...X...X" },
-      { sampleId: "tambourine", steps: "X.X.X.X.X.X.X.X.", vol: 0.5 },
+      { sampleId: "kick",       steps: "X...X...X...X...", vol: 0.88 },
+      { sampleId: "snare",      steps: "....X.......X...", vol: 0.82 },
+      { sampleId: "hat",        steps: "X.X.X.X.X.X.X.X.", vol: 0.50 },
+      { sampleId: "open-hat",   steps: "..X...X...X...X.", vol: 0.62 },
+      { sampleId: "tambourine", steps: "X.X.X.X.X.X.X.X.", vol: 0.48 },
     ],
   },
   {
     label: "Bossa",
     emoji: "🎸",
-    description: "Brazilian bossa nova — 3-2 clave, shaker, conga",
+    description: "Brazilian bossa nova — guitar chord stabs, 3-2 clave, soft conga",
     bpm: 105,
     tracks: [
-      { sampleId: "kick",      steps: "X.......X......." },
-      { sampleId: "rimshot",   steps: "..X.X.......X.X." },
-      { sampleId: "shaker",    steps: "X.X.X.X.X.X.X.X.", vol: 0.6 },
-      { sampleId: "woodblock", steps: "X..X..X...X.X...", vol: 0.7 },
-      { sampleId: "conga",     steps: "..X.....X.X.....", vol: 0.75 },
+      {
+        type: "melody", voice: "guitar", vol: 0.70, name: "Guitar",
+        noteSeq:  ["A3",null,null,null, "C#4",null,"E4",null, "A3",null,null,null, "E4",null,null,null],
+        durations:[  4, null,null,null,    2, null,  2, null,   4, null,null,null,   4, null,null,null],
+      },
+      { sampleId: "kick",      steps: "X.......X.......", vol: 0.55 },
+      { sampleId: "rimshot",   steps: "....X.......X...", vol: 0.45 },
+      { sampleId: "woodblock", steps: "X..X..X...X.X...", vol: 0.68 },
+      { sampleId: "conga",     steps: "..X.X...X...X...", vol: 0.62 },
+      { sampleId: "shaker",    steps: "X.X.X.X.X.X.X.X.", vol: 0.45 },
     ],
   },
   {
     label: "Latin",
     emoji: "💃",
-    description: "Latin groove — 3-2 clave on woodblock, conga, shaker",
-    bpm: 110,
+    description: "Salsa/mambo — campana cowbell, conga tumbao, 3-2 clave",
+    bpm: 115,
     tracks: [
-      { sampleId: "kick",      steps: "X.......X......." },
-      { sampleId: "snare",     steps: "....X.......X..." },
-      { sampleId: "conga",     steps: "X.X.X.X.X.X.X..." },
-      { sampleId: "woodblock", steps: "X..X..X...X.X..." },
-      { sampleId: "shaker",    steps: "X.X.X.X.X.X.X.X.", vol: 0.55 },
+      { sampleId: "kick",      steps: "X.......X.......", vol: 0.78 },
+      { sampleId: "rimshot",   steps: "..X...X...X...X.", vol: 0.68 },
+      { sampleId: "conga",     steps: "....X.X...X.X...", vol: 0.80 },
+      { sampleId: "cowbell",   steps: "X...X.X.X...X.X.", vol: 0.72 },
+      { sampleId: "woodblock", steps: "X..X..X...X.X...", vol: 0.58 },
+      { sampleId: "shaker",    steps: "X.X.X.X.X.X.X.X.", vol: 0.42 },
+    ],
+  },
+  // ── Genre grooves with melody ────────────────────────────────────────────
+  {
+    // Blues pentatonic riff in A minor.
+    label: "Blues Rock",
+    emoji: "🎸",
+    description: "12-bar blues riff in A — pentatonic minor guitar",
+    bpm: 96,
+    stepCount: 32,
+    tracks: [
+      {
+        type: "melody", voice: "guitar", vol: 0.82, name: "Guitar",
+        noteSeq: [
+          "A2",null,null,null, "C3",null,"D3",null, "Eb3",null,"D3",null, "C3",null,null,null,
+          "A2",null,null,null, "C3",null,"D3",null, "Eb3",null,"D3",null, "A2",null,null,null,
+        ],
+        durations: [
+          4,null,null,null, 2,null,2,null, 2,null,2,null, 4,null,null,null,
+          4,null,null,null, 2,null,2,null, 2,null,2,null, 4,null,null,null,
+        ],
+      },
+      { sampleId: "kick",      steps: "X...X.X.....X...X...X.X.....X...", vol: 0.82 },
+      { sampleId: "snare",     steps: "....X.......X.......X.......X...", vol: 0.78 },
+      { sampleId: "hat",       steps: "X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.", vol: 0.38 },
+      { sampleId: "floor-tom", steps: "..............X...............X.", vol: 0.60 },
+    ],
+  },
+  {
+    // Funk organ stabs on offbeats.
+    label: "Funk Groove",
+    emoji: "🎺",
+    description: "Tight funk — organ chords, syncopated kick, conga groove",
+    bpm: 98,
+    stepCount: 32,
+    tracks: [
+      {
+        type: "melody", voice: "organ", vol: 0.78, name: "Keys",
+        noteSeq: [
+          "Eb3",null, null,null, "Eb3",null, "Gb3",null, "Eb3",null, null,null, "Ab3",null, null,null,
+          "Eb3",null, null,null, "Eb3",null, "Gb3",null, "Bb3",null, "Ab3",null, null,null, null,null,
+        ],
+        durations: [
+          2,null, null,null, 2,null, 2,null, 2,null, null,null, 4,null, null,null,
+          2,null, null,null, 2,null, 2,null, 2,null, 4,null, null,null, null,null,
+        ],
+      },
+      { sampleId: "kick",  steps: "X......X...X..X.X......X...X..X.", vol: 0.84 },
+      { sampleId: "snare", steps: "....X.......X.......X.......X...", vol: 0.80 },
+      { sampleId: "hat",   steps: "X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.", vol: 0.38 },
+      { sampleId: "conga", steps: "..X.....X.X.....X...X.X.....X...", vol: 0.56 },
+    ],
+  },
+  {
+    // Boom bap piano stabs.
+    label: "Boom Bap",
+    emoji: "🎤",
+    description: "90s hip-hop — heavy snare, piano chord stabs",
+    bpm: 87,
+    stepCount: 16,
+    tracks: [
+      {
+        type: "melody", voice: "piano", vol: 0.72, name: "Piano",
+        noteSeq: [
+          "D3",null,null,null, null,null, "C3",null,
+          "A2",null,null,null, null,null,null,null,
+        ],
+        durations: [
+          4,null,null,null, null,null, 2,null,
+          8,null,null,null, null,null,null,null,
+        ],
+      },
+      { sampleId: "kick",  steps: "X.......X.X.....", vol: 0.88 },
+      { sampleId: "snare", steps: "....X.......X...", vol: 0.82 },
+      { sampleId: "hat",   steps: "..X...X...X...X.", vol: 0.42 },
+      { sampleId: "snap",  steps: "........X.......", vol: 0.65 },
+    ],
+  },
+  {
+    // Jazz walking bass ii-V-I in C.
+    label: "Jazz Swing",
+    emoji: "🎷",
+    description: "Swing feel — ii-V-I walking bass in C, piano",
+    bpm: 120,
+    stepCount: 64,
+    tracks: [
+      {
+        type: "melody", voice: "piano", vol: 0.70, name: "Piano",
+        noteSeq: [
+          "D3",null,null,null, "F3",null,null,null, "A3",null,null,null, "C4",null,null,null,
+          "G2",null,null,null, "B3",null,null,null, "D4",null,null,null, "F4",null,null,null,
+          "C3",null,null,null, "E3",null,null,null, "G3",null,null,null, "B3",null,null,null,
+          "C4",null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+        ],
+        durations: [
+          4,null,null,null, 4,null,null,null, 4,null,null,null, 4,null,null,null,
+          4,null,null,null, 4,null,null,null, 4,null,null,null, 4,null,null,null,
+          4,null,null,null, 4,null,null,null, 4,null,null,null, 4,null,null,null,
+          16,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+        ],
+      },
+      { sampleId: "kick",    steps: "X.......X.......X.......X.......X.......X.......X.......X.......", vol: 0.55 },
+      { sampleId: "rimshot", steps: "....X.......X.......X.......X.......X.......X.......X.......X...", vol: 0.62 },
+      { sampleId: "hat",     steps: "X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.X.", vol: 0.36 },
     ],
   },
 ];
@@ -631,7 +593,7 @@ export function GroovePresets({ onLoad, compact }: GroovePresetsProps) {
           <Tooltip key={g.label} content={`${g.description}  ·  ${g.bpm} BPM`}>
             <button
               type="button"
-              onClick={() => onLoad(makePattern(g.bpm, g.tracks, 16))}
+              onClick={() => onLoad(makePattern(g.bpm, g.tracks, g.stepCount ?? 16))}
               className="flex items-center gap-1.5 rounded-full border border-rim bg-well px-3 py-1.5 text-xs font-semibold text-ink-dim hover:text-ink hover:border-indigo-400/60 hover:bg-panel transition-colors active:scale-95"
             >
               <span aria-hidden="true">{g.emoji}</span>

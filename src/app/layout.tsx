@@ -1,12 +1,18 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  themeColor: "#6366f1",
+};
+
 export const metadata: Metadata = {
   title: "GrooveWeaver – Browser Beat Maker",
   description: "A browser-based step sequencer and groove machine built with Web Audio API",
-  themeColor: "#6366f1",
   appleWebApp: { capable: true, statusBarStyle: "black-translucent" },
 };
 

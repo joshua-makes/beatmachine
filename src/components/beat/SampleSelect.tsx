@@ -11,7 +11,6 @@ interface SampleSelectProps {
   onChange: (sampleId: string) => void;
 }
 
-const DRUM_IDS   = ["kick","sub","snare","clap","snap","rimshot","hat","open-hat","ride","crash","tom","hi-tom","floor-tom","conga","shaker","tambourine","woodblock","cowbell","perc","fx","laser"];
 const BASS_IDS   = ["bass","sub"];
 const MELODY_IDS = ["bass","chord","synth","fx","laser"];
 

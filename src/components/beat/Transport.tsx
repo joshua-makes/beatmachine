@@ -107,6 +107,8 @@ export function Transport({
       <Tooltip content="Type a BPM value" position="bottom">
         <input
           type="number"
+          inputMode="numeric"
+          pattern="[0-9]*"
           min={40}
           max={250}
           value={bpm}

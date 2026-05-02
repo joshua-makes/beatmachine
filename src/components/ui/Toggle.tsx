@@ -20,7 +20,7 @@ export function Toggle({ pressed, onToggle, label, className, variant = "default
       aria-label={label === "M" ? "Mute track" : label === "S" ? "Solo track" : label}
       onClick={onToggle}
       className={cn(
-        "rounded px-1.5 py-0.5 text-xs font-bold tracking-wide transition-colors",
+        "rounded px-2 py-1.5 text-xs font-bold tracking-wide transition-colors min-h-[28px]",
         !pressed && "bg-well text-ink-dim hover:bg-rim hover:text-ink border border-rim",
         pressed && variant === "mute" && "bg-red-600 text-white border border-red-500",
         pressed && variant === "solo" && "bg-yellow-400 text-zinc-900 border border-yellow-300",

@@ -7,7 +7,7 @@ import { StepGrid } from "./StepGrid";
 import { NotationStrip } from "./NotationStrip";
 import { Toggle } from "@/components/ui/Toggle";
 import { Tooltip } from "@/components/ui/Tooltip";
-import { TRACK_COLORS, cn } from "@/lib/utils";
+import { TRACK_COLORS } from "@/lib/utils";
 
 /** Format MIDI note as e.g. "C4", "F#3" */
 function midiLabel(midi: number): string {
@@ -22,7 +22,6 @@ interface TrackRowProps {
   trackColor: string;
   selectedNote: number | null;
   easyMode?: boolean;
-  canPaste?: boolean;
   /** Called when the drag handle is pointerdown — parent manages reorder */
   onDragHandlePointerDown?: (e: React.PointerEvent) => void;
   /** Filters the sample picker to only show sounds relevant to this section type */
@@ -38,8 +37,6 @@ interface TrackRowProps {
   onToggleType: () => void;
   onClear: () => void;
   onRandomize: () => void;
-  onCopy: () => void;
-  onPaste?: () => void;
   onRemove?: () => void;
   onRename: (name: string) => void;
   onEuclidean: () => void;
@@ -54,11 +51,6 @@ interface TrackRowProps {
   onShiftLeft?: () => void;
   /** Rotate all steps one position to the right (wraps) */
   onShiftRight?: () => void;
-  /** True when the step-range clipboard has content to paste */
-  canPasteRange?: boolean;
-  onCopyRange?: (start: number, end: number) => void;
-  onPasteRange?: (at: number) => void;
-  onFillFromRange?: (start: number, end: number) => void;
   /** Melody tracks: right-click cycles note duration (1→2→3→4 steps) */
   onDurationChange?: (step: number, duration: number) => void;
 }
@@ -71,7 +63,6 @@ export function TrackRow({
   trackColor,
   selectedNote,
   easyMode = false,
-  canPaste = false,
   sectionType,
   onDragHandlePointerDown,
   onPaintStart,
@@ -85,8 +76,6 @@ export function TrackRow({
   onToggleType,
   onClear,
   onRandomize,
-  onCopy,
-  onPaste,
   onRemove,
   onRename,
   onEuclidean,
@@ -98,18 +87,12 @@ export function TrackRow({
   onDuplicate,
   onShiftLeft,
   onShiftRight,
-  canPasteRange = false,
-  onCopyRange,
-  onPasteRange,
-  onFillFromRange,
   onDurationChange,
 }: TrackRowProps) {
   const isMelody = track.type === "melody";
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState(track.name ?? "");
   const nameInputRef = useRef<HTMLInputElement>(null);
-  const [selectionMode, setSelectionMode] = useState(false);
-  const [selection, setSelection] = useState<[number, number] | null>(null);
 
   // Build note labels for melody steps
   const noteLabels = isMelody
@@ -120,10 +103,7 @@ export function TrackRow({
       })
     : undefined;
 
-  // Per-track probability (avg across all steps)
-  const avgProb = track.probability.length > 0
-    ? track.probability.reduce((a, b) => a + b, 0) / track.probability.length
-    : 1;
+  const trackProb = track.probability ?? 1;
 
   function commitName() {
     setEditingName(false);
@@ -137,10 +117,10 @@ export function TrackRow({
       className={`flex items-center gap-3 px-2 py-1.5 rounded-lg transition-opacity ${track.mute ? "opacity-40" : ""}`}
       data-track-index={trackIndex}
     >
-      {/* Drag handle — hidden on mobile (HTML5 drag doesn't work on touch) */}
+      {/* Drag handle */}
       <div
         onPointerDown={onDragHandlePointerDown}
-        className="hidden sm:flex w-5 h-full items-center justify-center cursor-grab active:cursor-grabbing text-ink-ghost hover:text-ink-dim select-none shrink-0 touch-none text-base"
+        className="flex w-5 h-full items-center justify-center cursor-grab active:cursor-grabbing text-ink-ghost hover:text-ink-dim select-none shrink-0 touch-none text-base"
         aria-label="Drag to reorder track"
         title="Drag to reorder"
       >
@@ -229,7 +209,7 @@ export function TrackRow({
                   type="button"
                   onClick={() => onOctaveOffsetChange(Math.max(-3, (track.octaveOffset ?? 0) - 1))}
                   disabled={(track.octaveOffset ?? 0) <= -3}
-                  className="h-3.5 w-3.5 flex items-center justify-center rounded text-[9px] text-ink-ghost hover:text-ink hover:bg-well transition-colors disabled:opacity-30"
+                  className="h-6 w-6 flex items-center justify-center rounded text-xs text-ink-ghost hover:text-ink hover:bg-well transition-colors disabled:opacity-30"
                   aria-label="Octave down"
                 >−</button>
                 <span className="text-[9px] font-mono text-ink-dim w-7 text-center">
@@ -239,7 +219,7 @@ export function TrackRow({
                   type="button"
                   onClick={() => onOctaveOffsetChange(Math.min(3, (track.octaveOffset ?? 0) + 1))}
                   disabled={(track.octaveOffset ?? 0) >= 3}
-                  className="h-3.5 w-3.5 flex items-center justify-center rounded text-[9px] text-ink-ghost hover:text-ink hover:bg-well transition-colors disabled:opacity-30"
+                  className="h-6 w-6 flex items-center justify-center rounded text-xs text-ink-ghost hover:text-ink hover:bg-well transition-colors disabled:opacity-30"
                   aria-label="Octave up"
                 >+</button>
               </div>
@@ -290,41 +270,7 @@ export function TrackRow({
           noteLabels={noteLabels}
           velocities={track.velocity}
           stepCount={stepCount}
-          selection={selection}
-          selectionMode={selectionMode}
-          onRangeSelect={(start, end) => setSelection([start, end])}
         />
-        {/* Range selection action bar */}
-        {selectionMode && selection && (
-          <div className="flex items-center gap-1 pt-1 flex-wrap">
-            <span className="text-[10px] font-mono text-sky-400 shrink-0">
-              steps {selection[0] + 1}–{selection[1] + 1}
-            </span>
-            <button
-              type="button"
-              onClick={() => { onCopyRange?.(selection[0], selection[1]); }}
-              className="h-5 px-1.5 rounded text-[10px] font-medium bg-sky-500/20 text-sky-300 hover:bg-sky-500/30 transition-colors"
-            >Copy</button>
-            {canPasteRange && (
-              <button
-                type="button"
-                onClick={() => { onPasteRange?.(selection[0]); }}
-                className="h-5 px-1.5 rounded text-[10px] font-medium bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 transition-colors"
-              >Paste here</button>
-            )}
-            <button
-              type="button"
-              onClick={() => { onFillFromRange?.(selection[0], selection[1]); }}
-              className="h-5 px-1.5 rounded text-[10px] font-medium bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 transition-colors"
-            >Fill →</button>
-            <button
-              type="button"
-              onClick={() => setSelection(null)}
-              className="h-5 w-5 flex items-center justify-center rounded text-[10px] text-ink-ghost hover:text-rose-400 hover:bg-well transition-colors"
-              aria-label="Clear selection"
-            >✕</button>
-          </div>
-        )}
         {teachMode && (
           <NotationStrip
             steps={track.steps}
@@ -352,13 +298,13 @@ export function TrackRow({
 
         {/* Probability — shown in advanced mode */}
         {!easyMode && (
-          <Tooltip content={`Fire probability: ${Math.round(avgProb * 100)}% — steps only fire this % of the time`}>
+          <Tooltip content={`Fire probability: ${Math.round(trackProb * 100)}% — steps only fire this % of the time`}>
             <input
               type="range"
               min={0}
               max={1}
               step={0.05}
-              value={avgProb}
+              value={trackProb}
               onChange={(e) => onChangeProbability(parseFloat(e.target.value))}
               className="w-10 accent-purple-500 cursor-pointer"
               aria-label={`Track ${trackIndex + 1} probability`}
@@ -406,44 +352,6 @@ export function TrackRow({
             aria-label="Shift steps right"
           >→</button>
         </Tooltip>
-
-        {/* Range-select mode toggle */}
-        <Tooltip content={selectionMode ? "Exit selection mode" : "Select a range of steps to copy, paste or fill"}>
-          <button
-            type="button"
-            onClick={() => { setSelectionMode((m) => !m); if (selectionMode) setSelection(null); }}
-            className={`h-6 w-6 flex items-center justify-center rounded text-xs transition-colors shrink-0 ${
-              selectionMode
-                ? "text-sky-300 bg-sky-500/20 ring-1 ring-sky-500/40"
-                : "text-ink-ghost hover:text-sky-400 hover:bg-well"
-            }`}
-            aria-label={selectionMode ? "Exit selection mode" : "Select range"}
-            aria-pressed={selectionMode}
-          >▣</button>
-        </Tooltip>
-
-        <Tooltip content="Copy this track's pattern">
-          <button
-            type="button"
-            onClick={onCopy}
-            className="h-6 w-6 flex items-center justify-center rounded text-ink-ghost hover:text-ink hover:bg-well text-xs transition-colors shrink-0"
-            aria-label="Copy track"
-          >
-            ⧉
-          </button>
-        </Tooltip>
-        {canPaste && onPaste && (
-          <Tooltip content="Paste copied pattern onto this track">
-            <button
-              type="button"
-              onClick={onPaste}
-              className="h-6 w-6 flex items-center justify-center rounded text-ink-ghost hover:text-indigo-400 hover:bg-well text-xs transition-colors shrink-0"
-              aria-label="Paste track"
-            >
-              ⤵
-            </button>
-          </Tooltip>
-        )}
         {onDuplicate && (
           <Tooltip content="Duplicate this track — inserts a copy below">
             <button

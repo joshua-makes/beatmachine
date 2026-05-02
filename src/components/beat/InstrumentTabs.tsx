@@ -39,7 +39,8 @@ export function InstrumentTabs({
   onRemoveSection,
 }: InstrumentTabsProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [pickerPos, setPickerPos]   = useState({ x: 0, y: 0 });
+  const [pickerPos, setPickerPos]   = useState({ x: 0, y: 0, maxH: 0 });
+  const [pickerFlip, setPickerFlip] = useState(false);
   const addBtnRef = useRef<HTMLButtonElement>(null);
 
   // Close on Escape
@@ -52,7 +53,17 @@ export function InstrumentTabs({
 
   function openPicker() {
     const rect = addBtnRef.current?.getBoundingClientRect();
-    if (rect) setPickerPos({ x: rect.left, y: rect.bottom + 4 });
+    if (!rect) return;
+    const panelW = 288; // w-72
+    const margin = 8;
+    const spaceBelow = window.innerHeight - rect.bottom - margin;
+    const spaceAbove = rect.top - margin;
+    const flip = spaceAbove > spaceBelow;
+    const maxH = Math.max(flip ? spaceAbove : spaceBelow, 120);
+    const y = flip ? rect.top - margin : rect.bottom + margin;
+    const x = Math.min(rect.left, window.innerWidth - panelW - margin);
+    setPickerPos({ x: Math.max(margin, x), y, maxH });
+    setPickerFlip(flip);
     setPickerOpen(true);
   }
 
@@ -147,8 +158,10 @@ export function InstrumentTabs({
           <div
             role="dialog"
             aria-label="Choose instrument"
-            className="fixed z-[9999] bg-panel border border-rim rounded-xl shadow-2xl p-3 w-72 max-h-[70vh] overflow-y-auto"
-            style={{ left: pickerPos.x, top: pickerPos.y }}
+            className="fixed z-[9999] bg-panel border border-rim rounded-xl shadow-2xl p-3 w-72 overflow-y-auto"
+            style={pickerFlip
+              ? { left: pickerPos.x, bottom: window.innerHeight - pickerPos.y, maxHeight: pickerPos.maxH }
+              : { left: pickerPos.x, top: pickerPos.y, maxHeight: pickerPos.maxH }}
             onPointerDown={(e) => e.stopPropagation()}
           >
             <p className="text-[11px] font-semibold text-ink-ghost uppercase tracking-widest mb-2 px-1">

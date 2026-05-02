@@ -15,8 +15,8 @@ export interface TrackState {
   notes: (number | number[] | null)[];
   /** Per-step velocity 0–1 (default 1.0). Right-click active steps to cycle soft/ghost. */
   velocity: number[];
-  /** Per-step fire probability 0–1 (default 1.0). 1 = always fires, 0.5 = 50% chance. */
-  probability: number[];
+  /** Per-track fire probability 0–1 (default 1.0). 1 = always fires, 0.5 = 50% chance. */
+  probability: number;
   /** Per-step note duration in steps (default 1). Melody tracks only — sets how many steps the note rings. */
   durations?: number[];
   /** Octave transpose for melody tracks: -3 to +3. Default 0. */
@@ -147,7 +147,7 @@ function emptyTrack(id: string, sampleId: string, type: TrackState["type"], step
     steps: Array(stepCount).fill(false) as boolean[],
     notes: Array(stepCount).fill(null) as (number | null)[],
     velocity: Array(stepCount).fill(1) as number[],
-    probability: Array(stepCount).fill(1) as number[],
+    probability: 1,
     durations: Array(stepCount).fill(1) as number[],
   };
 }
@@ -324,7 +324,7 @@ export function deserializePattern(data: string): Pattern {
               type:        "drum",
               notes:       Array((t.steps as boolean[])?.length ?? stepCount).fill(null),
               velocity:    Array((t.steps as boolean[])?.length ?? stepCount).fill(1),
-              probability: Array((t.steps as boolean[])?.length ?? stepCount).fill(1),
+              probability: Array.isArray(t.probability) ? ((t.probability as number[])[0] ?? 1) : (t.probability ?? 1),
               durations:   Array((t.steps as boolean[])?.length ?? stepCount).fill(1),
               ...t,
             }))
@@ -343,7 +343,7 @@ export function deserializePattern(data: string): Pattern {
         type:        "drum",
         notes:       Array((t.steps as boolean[])?.length ?? stepCount).fill(null),
         velocity:    Array((t.steps as boolean[])?.length ?? stepCount).fill(1),
-        probability: Array((t.steps as boolean[])?.length ?? stepCount).fill(1),
+        probability: Array.isArray(t.probability) ? ((t.probability as number[])[0] ?? 1) : (t.probability ?? 1),
         durations:   Array((t.steps as boolean[])?.length ?? stepCount).fill(1),
         ...t,
       })) as TrackState[];

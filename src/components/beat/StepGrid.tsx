@@ -19,12 +19,6 @@ interface StepGridProps {
   noteLabels?: (string | null)[];
   /** Per-step velocity 0–1. Defaults to 1.0 when not provided. */
   velocities?: number[];
-  /** Highlight these steps with a selection ring */
-  selection?: [number, number] | null;
-  /** When true, dragging selects a range instead of painting steps */
-  selectionMode?: boolean;
-  /** Called while dragging in selection mode */
-  onRangeSelect?: (start: number, end: number) => void;
   /** Per-step note duration in steps (melody tracks). Default 1. */
   durations?: number[];
   /** Hold/long-press or right-click an active step to set duration via a picker. */
@@ -57,7 +51,6 @@ export function StepGrid({
   steps, currentStep, trackIndex,
   onPaintStart, onPaint, onVelocityChange,
   disabled, trackColor, noteLabels, velocities,
-  selection, selectionMode, onRangeSelect,
   durations, onDurationChange, stepCount,
 }: StepGridProps) {
   const activeColor = trackColor ?? "#6366f1";
@@ -68,8 +61,7 @@ export function StepGrid({
   const containerRef = useRef<HTMLDivElement>(null);
   const stepsRef = useRef(steps);
   stepsRef.current = steps;
-  /** Tracks the anchor step when dragging in selection mode */
-  const rangeStartRef = useRef<number | null>(null);
+
 
   // ── Long-press / picker ────────────────────────────────────────────────────
   const longTimerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -99,8 +91,7 @@ export function StepGrid({
 
   useEffect(() => {
     function globalStop() {
-      paintRef.current      = null;
-      rangeStartRef.current = null;
+      paintRef.current = null;
       flushPendingErase();
     }
     window.addEventListener("pointerup",     globalStop);
@@ -166,17 +157,6 @@ export function StepGrid({
         }
       }
     }
-    // Selection-mode drag: extend the range
-    if (selectionMode) {
-      if (rangeStartRef.current === null) return;
-      const step = stepAtPoint(e.clientX, e.clientY);
-      if (step === null) return;
-      onRangeSelect?.(
-        Math.min(rangeStartRef.current, step),
-        Math.max(rangeStartRef.current, step),
-      );
-      return;
-    }
     if (!paintRef.current) return;
     const step = stepAtPoint(e.clientX, e.clientY);
     if (step === null || step === paintRef.current.lastStep) return;
@@ -196,7 +176,7 @@ export function StepGrid({
     <>
       <div
         ref={containerRef}
-        className={`flex gap-1 select-none touch-none${selectionMode ? " cursor-crosshair" : ""}`}
+        className="flex gap-1 select-none touch-none"
         role="group"
         aria-label={`Track ${trackIndex + 1} steps`}
         onPointerMove={handlePointerMove}
@@ -215,7 +195,6 @@ export function StepGrid({
         const dur      = durations?.[i] ?? 1;
         // Dim active steps according to velocity level
         const opacity = active ? (vel > 0.6 ? 1 : vel > 0.3 ? 0.55 : 0.3) : 1;
-        const inSel = selection != null && i >= selection[0] && i <= selection[1];
         // A step is "held" if a previous step's duration reaches into it
         const isHeld = !active && (() => {
           for (let j = Math.max(0, i - 15); j < i; j++) {
@@ -244,11 +223,6 @@ export function StepGrid({
                 if (disabled) return;
                 e.preventDefault();
                 (e.currentTarget as HTMLButtonElement).setPointerCapture(e.pointerId);
-                if (selectionMode) {
-                  rangeStartRef.current = i;
-                  onRangeSelect?.(i, i);
-                  return;
-                }
                 if (e.button !== 0) return; // right/middle handled by container onContextMenu
 
                 if (active && hasPicker) {
@@ -280,7 +254,6 @@ export function StepGrid({
                     : "bg-well hover:bg-rim border border-rim",
                 currentStep === i && active  && "ring-2 ring-white/70 ring-offset-1 ring-offset-zinc-900",
                 currentStep === i && !active && "bg-rim",
-                inSel    && "ring-2 ring-sky-400/70 ring-offset-1 ring-offset-zinc-900",
                 disabled && "opacity-50 cursor-not-allowed",
               )}
             >

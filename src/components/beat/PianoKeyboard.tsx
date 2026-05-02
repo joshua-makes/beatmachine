@@ -5,7 +5,6 @@ import {
   SCALE_LABELS,
   getScaleMidiSet,
   getDiatonicChords,
-  midiNoteNumber,
   type NoteName,
   type ScaleName,
 } from "@/lib/scales";
@@ -207,7 +206,7 @@ export function PianoKeyboard({
       {/* ── Piano keyboard ── */}
       <div
         className="flex rounded-lg overflow-hidden border border-rim"
-        style={{ height: "80px" }}
+        style={{ height: "96px" }}
       >
         {octaves.map((oct) => {
           return (

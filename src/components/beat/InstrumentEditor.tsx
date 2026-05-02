@@ -1,6 +1,6 @@
 "use client";
-import React from "react";
-import { type InstrumentSection, type TrackState, type SectionType } from "@/lib/pattern";
+import React, { useRef } from "react";
+import { type InstrumentSection, type SectionType } from "@/lib/pattern";
 import { TrackRow } from "./TrackRow";
 import { TRACK_COLORS } from "@/lib/utils";
 import { Tooltip } from "@/components/ui/Tooltip";
@@ -12,11 +12,7 @@ interface InstrumentEditorProps {
   isPlaying: boolean;
   easyMode: boolean;
   selectedNote: number | null;
-  canPaste: boolean;
-  canPasteRange: boolean;
   teachMode: boolean;
-  loopRange: [number, number] | null;
-  clipboardTrack: Pick<TrackState, "steps" | "notes" | "velocity"> | null;
   dragOver: number | null;
   onDragStart: (trackIndex: number) => void;
   onDragEnter: (trackIndex: number) => void;
@@ -33,8 +29,6 @@ interface InstrumentEditorProps {
   onToggleType:  (trackIndex: number) => void;
   onClear:       (trackIndex: number) => void;
   onRandomize:   (trackIndex: number) => void;
-  onCopy:        (trackIndex: number) => void;
-  onPaste:       (trackIndex: number) => void;
   onRemove:      (trackIndex: number) => void;
   onRename:      (trackIndex: number, name: string) => void;
   onEuclidean:   (trackIndex: number) => void;
@@ -44,9 +38,6 @@ interface InstrumentEditorProps {
   onDuplicate:     (trackIndex: number) => void;
   onShiftLeft:     (trackIndex: number) => void;
   onShiftRight:    (trackIndex: number) => void;
-  onCopyRange:     (trackIndex: number, start: number, end: number) => void;
-  onPasteRange:    (trackIndex: number, at: number) => void;
-  onFillFromRange: (trackIndex: number, start: number, end: number) => void;
   onAddTrack:  () => void;
   onFocusTrack: (trackIndex: number) => void;
   /** Melody tracks: right-click a step cycles note duration (1→2→3→4 steps) */
@@ -62,8 +53,6 @@ export function InstrumentEditor({
   isPlaying,
   easyMode,
   selectedNote,
-  canPaste,
-  canPasteRange,
   teachMode,
   dragOver,
   onDragStart,
@@ -81,8 +70,6 @@ export function InstrumentEditor({
   onToggleType,
   onClear,
   onRandomize,
-  onCopy,
-  onPaste,
   onRemove,
   onRename,
   onEuclidean,
@@ -92,22 +79,53 @@ export function InstrumentEditor({
   onDuplicate,
   onShiftLeft,
   onShiftRight,
-  onCopyRange,
-  onPasteRange,
-  onFillFromRange,
   onAddTrack,
   onFocusTrack,
   onDurationChange,
   sectionType,
 }: InstrumentEditorProps) {
   const tracks = section.tracks;
+  const draggingRef = useRef<number | null>(null);
+  const localDragOverRef = useRef<number | null>(null);
+  const trackRowsRef = useRef<HTMLDivElement>(null);
+
+  function handleDragHandleDown(trackIdx: number, e: React.PointerEvent) {
+    e.preventDefault();
+    draggingRef.current = trackIdx;
+    onDragStart(trackIdx);
+  }
+
+  function handlePointerMove(e: React.PointerEvent) {
+    if (draggingRef.current === null || !trackRowsRef.current) return;
+    const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
+    if (!el) return;
+    const rowEl = el.closest('[data-track-row]') as HTMLElement | null;
+    if (!rowEl) return;
+    const idx = parseInt(rowEl.dataset.trackRow ?? '-1', 10);
+    if (idx >= 0 && idx !== localDragOverRef.current) {
+      localDragOverRef.current = idx;
+      onDragEnter(idx);
+    }
+  }
+
+  function handlePointerUp() {
+    if (draggingRef.current !== null) {
+      if (localDragOverRef.current !== null) {
+        onDragDrop(localDragOverRef.current);
+      } else {
+        onDragEnd();
+      }
+      draggingRef.current = null;
+      localDragOverRef.current = null;
+    }
+  }
 
   return (
     <div>
       {/* Step number header */}
       <div className="flex items-center gap-3 px-2 py-1.5 border-b border-rim">
         {/* Spacer matching drag handle column */}
-        <div className="hidden sm:block w-5 shrink-0" aria-hidden="true" />
+        <div className="w-5 shrink-0" aria-hidden="true" />
         {/* Spacer matching track controls column */}
         <div className="w-48 min-w-48 sm:w-60 sm:min-w-60 shrink-0" aria-hidden="true" />
         <div className="flex gap-1">
@@ -131,14 +149,11 @@ export function InstrumentEditor({
       </div>
 
       {/* Track rows */}
+      <div ref={trackRowsRef} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerLeave={handlePointerUp}>
       {tracks.map((track, i) => (
         <div
           key={track.id}
-          draggable
-          onDragStart={() => onDragStart(i)}
-          onDragOver={(e) => { e.preventDefault(); onDragEnter(i); }}
-          onDrop={() => onDragDrop(i)}
-          onDragEnd={onDragEnd}
+          data-track-row={i}
           onFocus={() => onFocusTrack(i)}
           className={dragOver === i ? "outline outline-2 outline-indigo-400/60 rounded-lg" : ""}
         >
@@ -150,10 +165,9 @@ export function InstrumentEditor({
             trackColor={track.color ?? TRACK_COLORS[i % TRACK_COLORS.length]}
             selectedNote={selectedNote}
             easyMode={easyMode}
-            canPaste={canPaste}
             teachMode={teachMode}
             stepCount={stepCount}
-            onDragHandlePointerDown={() => onDragStart(i)}
+            onDragHandlePointerDown={(e) => handleDragHandleDown(i, e)}
             sectionType={sectionType}
             onPaintStart={(step, value) => onPaintStart(i, step, value)}
             onPaint={(step, value) => onPaint(i, step, value)}
@@ -166,8 +180,6 @@ export function InstrumentEditor({
             onToggleType={() => onToggleType(i)}
             onClear={() => onClear(i)}
             onRandomize={() => onRandomize(i)}
-            onCopy={() => onCopy(i)}
-            onPaste={canPaste ? () => onPaste(i) : undefined}
             onRemove={tracks.length > 1 ? () => onRemove(i) : undefined}
             onRename={(name) => onRename(i, name)}
             onEuclidean={() => onEuclidean(i)}
@@ -177,14 +189,11 @@ export function InstrumentEditor({
             onDuplicate={tracks.length < 16 ? () => onDuplicate(i) : undefined}
             onShiftLeft={() => onShiftLeft(i)}
             onShiftRight={() => onShiftRight(i)}
-            canPasteRange={canPasteRange}
-            onCopyRange={(start, end) => onCopyRange(i, start, end)}
-            onPasteRange={(at) => onPasteRange(i, at)}
-            onFillFromRange={(start, end) => onFillFromRange(i, start, end)}
             onDurationChange={(step, duration) => onDurationChange(i, step, duration)}
           />
         </div>
       ))}
+      </div>
 
       {/* Add track button */}
       {tracks.length < 16 && (

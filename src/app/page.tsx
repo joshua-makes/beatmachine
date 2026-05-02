@@ -11,7 +11,6 @@ import { Scheduler, stepDurationSec } from "@/lib/audio/scheduler";
 import {
   createDefaultPattern, decodeShareUrl,
   type Pattern, type TrackState, type InstrumentSection, type SectionPreset,
-  SECTION_COLORS,
 } from "@/lib/pattern";
 import { clamp } from "@/lib/utils";
 import { PianoKeyboard } from "@/components/beat/PianoKeyboard";
@@ -61,15 +60,6 @@ export default function Home() {
   const redoStackRef = useRef<Pattern[]>([]);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
-
-  // Clipboard: stores a copied track's steps/notes/velocity
-  const [clipboardTrack, setClipboardTrack] = useState<Pick<TrackState, "steps" | "notes" | "velocity"> | null>(null);
-  // Step-range clipboard: stores a copied region of steps from a single track
-  const [stepRangeClipboard, setStepRangeClipboard] = useState<{
-    steps: boolean[];
-    notes: (number | number[] | null)[];
-    velocity: number[];
-  } | null>(null);
 
   // Metronome
   const [metronomeActive, setMetronomeActive] = useState(false);
@@ -155,7 +145,7 @@ export default function Home() {
       undoStackRef.current = [];
       redoStackRef.current = [];
     }
-  }, []);
+  }, [setPattern, setPatternSlots]);
 
   // Debounced auto-save: persist both slots on every change
   useEffect(() => {
@@ -263,8 +253,8 @@ export default function Home() {
         if (hasSoloTrack && !track.solo) continue;
         if (!track.steps[secStep]) continue;
 
-        // Per-step probability gate
-        const prob = track.probability?.[secStep] ?? 1;
+        // Per-track probability gate
+        const prob = track.probability ?? 1;
         if (prob < 1 && Math.random() > prob) return;
 
         if (track.type === "melody") {
@@ -411,11 +401,8 @@ export default function Home() {
           velocity: count > t.velocity.length
             ? [...t.velocity, ...Array(count - t.velocity.length).fill(1)]
             : t.velocity.slice(0, count),
-          probability: count > (t.probability?.length ?? 0)
-            ? [...(t.probability ?? []), ...Array(count - (t.probability?.length ?? 0)).fill(1)]
-            : (t.probability ?? Array(count).fill(1)).slice(0, count),
           durations: count > (t.durations?.length ?? 0)
-            ? [...(t.durations ?? Array(t.steps.length).fill(1)), ...Array(count - (t.durations?.length ?? t.steps.length)).fill(1)]
+            ? [...(t.durations ?? []), ...Array(count - (t.durations?.length ?? 0)).fill(1)]
             : (t.durations ?? Array(count).fill(1)).slice(0, count),
         })),
       })),
@@ -457,9 +444,6 @@ export default function Home() {
     });
   }
 
-  function handleVoiceChange(sectionId: string, trackIndex: number, voice: string) {
-    updateTrack(sectionId, trackIndex, (t) => ({ ...t, voice }));
-  }
 
   async function handleSoundPackSwitch(packId: string, folder: string) {
     setSoundPackId(packId);
@@ -470,23 +454,6 @@ export default function Home() {
     }
   }
 
-  /** Click a step number while loop range is active to move the nearest endpoint */
-  function handleLoopStepClick(step: number) {
-    if (!loopRange) return;
-    const [s, e] = loopRange;
-    if (step < s) {
-      setLoopRange([step, e]);
-    } else if (step > e) {
-      setLoopRange([s, step]);
-    } else {
-      const mid = (s + e) / 2;
-      if (step <= mid) {
-        setLoopRange([step === e ? Math.max(0, step - 1) : step, e]);
-      } else {
-        setLoopRange([s, step === s ? Math.min(pattern.stepCount - 1, step + 1) : step]);
-      }
-    }
-  }
 
   function handleReset() {
     pushHistory();
@@ -499,7 +466,6 @@ export default function Home() {
           steps:       Array(prev.stepCount).fill(false) as boolean[],
           notes:       Array(prev.stepCount).fill(null),
           velocity:    Array(prev.stepCount).fill(1) as number[],
-          probability: Array(prev.stepCount).fill(1) as number[],
           durations:   Array(prev.stepCount).fill(1) as number[],
         })),
       })),
@@ -594,7 +560,7 @@ export default function Home() {
       steps: Array(pattern.stepCount).fill(false) as boolean[],
       notes: Array(pattern.stepCount).fill(null) as (number | null)[],
       velocity: Array(pattern.stepCount).fill(1) as number[],
-      probability: Array(pattern.stepCount).fill(1) as number[],
+      probability: 1,
       durations: Array(pattern.stepCount).fill(1) as number[],
     };
     updateSection(sectionId, (s) => ({ ...s, tracks: [...s.tracks, newTrack] }));
@@ -608,32 +574,6 @@ export default function Home() {
       ...s,
       tracks: s.tracks.filter((_, i) => i !== trackIndex),
     }));
-  }
-
-  // ── Copy / paste track ────────────────────────────────────────────────────
-
-  function handleCopyTrack(sectionId: string, trackIndex: number) {
-    const sec = pattern.sections.find((s) => s.id === sectionId);
-    if (!sec) return;
-    const t = sec.tracks[trackIndex];
-    setClipboardTrack({ steps: [...t.steps], notes: [...t.notes], velocity: [...t.velocity] });
-  }
-
-  function handlePasteTrack(sectionId: string, trackIndex: number) {
-    if (!clipboardTrack) return;
-    pushHistory();
-    updateTrack(sectionId, trackIndex, (t) => {
-      const len = t.steps.length;
-      function padArr<T>(arr: T[], fill: T): T[] {
-        return arr.length >= len ? arr.slice(0, len) : [...arr, ...Array(len - arr.length).fill(fill)];
-      }
-      return {
-        ...t,
-        steps:    padArr(clipboardTrack.steps,    false),
-        notes:    padArr(clipboardTrack.notes,    null),
-        velocity: padArr(clipboardTrack.velocity, 1),
-      };
-    });
   }
 
   // ── Duplicate track ───────────────────────────────────────────────────────
@@ -651,7 +591,7 @@ export default function Home() {
         steps: [...original.steps],
         notes: [...original.notes],
         velocity: [...original.velocity],
-        probability: [...original.probability],
+        probability: original.probability,
         durations: original.durations ? [...original.durations] : undefined,
       };
       tracks.splice(trackIndex + 1, 0, clone);
@@ -695,71 +635,12 @@ export default function Home() {
           steps:    [...t.steps,    ...t.steps],
           notes:    [...t.notes,    ...t.notes],
           velocity: [...t.velocity, ...t.velocity],
-          probability: [...t.probability, ...t.probability],
+          probability: t.probability,
           durations: t.durations ? [...t.durations, ...t.durations] : undefined,
         })),
       })),
     }));
     setLoopRange((r) => r ? [r[0], Math.min(r[1], newCount - 1)] : null);
-  }
-
-  // ── Step-range copy / paste / fill ────────────────────────────────────────
-
-  function handleCopyRange(sectionId: string, trackIndex: number, start: number, end: number) {
-    const sec = pattern.sections.find((s) => s.id === sectionId);
-    if (!sec) return;
-    const t = sec.tracks[trackIndex];
-    const s = Math.min(start, end);
-    const e = Math.max(start, end);
-    setStepRangeClipboard({
-      steps:    t.steps.slice(s, e + 1),
-      notes:    t.notes.slice(s, e + 1),
-      velocity: t.velocity.slice(s, e + 1),
-    });
-  }
-
-  function handlePasteRange(sectionId: string, trackIndex: number, at: number) {
-    if (!stepRangeClipboard) return;
-    pushHistory();
-    updateTrack(sectionId, trackIndex, (t) => {
-      const newSteps    = [...t.steps];
-      const newNotes    = [...t.notes];
-      const newVelocity = [...t.velocity];
-      stepRangeClipboard.steps.forEach((sv, j) => {
-        const idx = at + j;
-        if (idx < t.steps.length) {
-          newSteps[idx]    = sv;
-          newNotes[idx]    = stepRangeClipboard.notes[j] ?? null;
-          newVelocity[idx] = stepRangeClipboard.velocity[j] ?? 1;
-        }
-      });
-      return { ...t, steps: newSteps, notes: newNotes, velocity: newVelocity };
-    });
-  }
-
-  function handleFillFromRange(sectionId: string, trackIndex: number, start: number, end: number) {
-    pushHistory();
-    const sec = pattern.sections.find((s) => s.id === sectionId);
-    if (!sec) return;
-    const t = sec.tracks[trackIndex];
-    const s = Math.min(start, end);
-    const e = Math.max(start, end);
-    const len = e - s + 1;
-    const srcSteps    = t.steps.slice(s, e + 1);
-    const srcNotes    = t.notes.slice(s, e + 1);
-    const srcVelocity = t.velocity.slice(s, e + 1);
-    updateTrack(sectionId, trackIndex, (track) => {
-      const newSteps    = [...track.steps];
-      const newNotes    = [...track.notes];
-      const newVelocity = [...track.velocity];
-      for (let i = e + 1; i < track.steps.length; i++) {
-        const j = (i - s) % len;
-        newSteps[i]    = srcSteps[j];
-        newNotes[i]    = srcNotes[j] ?? null;
-        newVelocity[i] = srcVelocity[j] ?? 1;
-      }
-      return { ...track, steps: newSteps, notes: newNotes, velocity: newVelocity };
-    });
   }
 
   // ── Rename track ──────────────────────────────────────────────────────────
@@ -773,7 +654,7 @@ export default function Home() {
   function handleChangeProbability(sectionId: string, trackIndex: number, prob: number) {
     updateTrack(sectionId, trackIndex, (t) => ({
       ...t,
-      probability: t.probability.map(() => prob),
+      probability: prob,
     }));
   }
 
@@ -931,7 +812,7 @@ export default function Home() {
         steps: Array(pattern.stepCount).fill(false) as boolean[],
         notes: Array(pattern.stepCount).fill(null) as (number | null)[],
         velocity: Array(pattern.stepCount).fill(1) as number[],
-        probability: Array(pattern.stepCount).fill(1) as number[],
+        probability: 1,
         durations: Array(pattern.stepCount).fill(1) as number[],
       }],
     };
@@ -1161,11 +1042,7 @@ export default function Home() {
                 isPlaying={isPlaying}
                 easyMode={easyMode}
                 selectedNote={selectedNote}
-                canPaste={!!clipboardTrack}
-                canPasteRange={!!stepRangeClipboard}
                 teachMode={teachMode}
-                loopRange={loopRange}
-                clipboardTrack={clipboardTrack}
                 dragOver={dragOver}
                 onDragStart={handleDragStart}
                 onDragEnter={handleDragEnter}
@@ -1197,8 +1074,6 @@ export default function Home() {
                 onToggleType={(ti) => handleToggleTrackType(activeSection.id, ti)}
                 onClear={(ti) => handleClearTrack(activeSection.id, ti)}
                 onRandomize={(ti) => handleRandomizeTrack(activeSection.id, ti)}
-                onCopy={(ti) => handleCopyTrack(activeSection.id, ti)}
-                onPaste={(ti) => handlePasteTrack(activeSection.id, ti)}
                 onRemove={(ti) => handleRemoveTrack(activeSection.id, ti)}
                 onRename={(ti, name) => handleRenameTrack(activeSection.id, ti, name)}
                 onEuclidean={(ti) => setEuclidTrack({ sectionId: activeSection.id, trackIndex: ti })}
@@ -1208,9 +1083,6 @@ export default function Home() {
                 onDuplicate={(ti) => handleDuplicateTrack(activeSection.id, ti)}
                 onShiftLeft={(ti) => handleShiftTrack(activeSection.id, ti, -1)}
                 onShiftRight={(ti) => handleShiftTrack(activeSection.id, ti, 1)}
-                onCopyRange={(ti, start, end) => handleCopyRange(activeSection.id, ti, start, end)}
-                onPasteRange={(ti, at) => handlePasteRange(activeSection.id, ti, at)}
-                onFillFromRange={(ti, start, end) => handleFillFromRange(activeSection.id, ti, start, end)}
                 onDurationChange={(ti, step, dur) => handleDurationChange(activeSection.id, ti, step, dur)}
                 onAddTrack={() => handleAddTrack(activeSection.id)}
                 onFocusTrack={setFocusedTrack}
